@@ -1,0 +1,2455 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>SIM KEUANGAN SD GIM</title>
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root{
+    --primary:#12355b;
+    --primary2:#1d5d9b;
+    --bg:#f4f7fb;
+    --white:#ffffff;
+    --success:#198754;
+    --danger:#dc3545;
+    --warning:#f39c12;
+    --info:#0d6efd;
+    --text:#263238;
+    --muted:#718096;
+    --border:#e7edf4;
+}
+
+*{
+    box-sizing:border-box;
+    margin:0;
+    padding:0;
+    font-family:Arial,Helvetica,sans-serif;
+}
+
+body{
+    background:var(--bg);
+    color:var(--text);
+}
+
+/* ================= SIDEBAR ================= */
+
+.sidebar{
+    position:fixed;
+    width:270px;
+    height:100vh;
+    background:linear-gradient(180deg,#102f50,#081d33);
+    color:white;
+    overflow-y:auto;
+    z-index:1000;
+    transition:.3s;
+}
+
+.brand{
+    padding:22px 18px;
+    border-bottom:1px solid rgba(255,255,255,.1);
+}
+
+.brand h2{
+    font-size:18px;
+}
+
+.brand p{
+    font-size:11px;
+    opacity:.7;
+    margin-top:5px;
+}
+
+.menu-section{
+    font-size:10px;
+    letter-spacing:1px;
+    color:#8ca3b9;
+    padding:20px 18px 8px;
+    font-weight:bold;
+}
+
+.menu-item{
+    margin:3px 10px;
+    padding:12px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    font-size:14px;
+    transition:.2s;
+}
+
+.menu-item:hover,
+.menu-item.active{
+    background:var(--primary2);
+}
+
+.menu-item i:first-child{
+    width:20px;
+    text-align:center;
+}
+
+.arrow{
+    margin-left:auto;
+    font-size:11px;
+}
+
+.submenu{
+    display:none;
+    padding-left:25px;
+}
+
+.submenu.open{
+    display:block;
+}
+
+.submenu div{
+    padding:9px 12px;
+    color:#c7d4df;
+    font-size:13px;
+    cursor:pointer;
+    border-radius:6px;
+    margin:2px 8px;
+}
+
+.submenu div:hover{
+    background:rgba(255,255,255,.08);
+    color:white;
+}
+
+/* ================= MAIN ================= */
+
+.main{
+    margin-left:270px;
+    min-height:100vh;
+}
+
+.topbar{
+    height:70px;
+    background:white;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:0 28px;
+    box-shadow:0 2px 10px rgba(0,0,0,.04);
+}
+
+.topbar-left{
+    display:flex;
+    align-items:center;
+    gap:15px;
+}
+
+.mobile-menu{
+    display:none;
+    border:none;
+    background:none;
+    font-size:20px;
+}
+
+.user-box{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.avatar{
+    width:40px;
+    height:40px;
+    background:var(--primary2);
+    color:white;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+.content{
+    padding:28px;
+}
+
+.page-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:22px;
+}
+
+.page-header h1{
+    font-size:24px;
+    color:var(--primary);
+}
+
+.page-header p{
+    margin-top:5px;
+    color:var(--muted);
+    font-size:14px;
+}
+
+/* ================= CARDS ================= */
+
+.cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:18px;
+    margin-bottom:25px;
+}
+
+.card{
+    background:white;
+    border-radius:14px;
+    padding:20px;
+    box-shadow:0 4px 20px rgba(0,0,0,.04);
+    position:relative;
+}
+
+.card-icon{
+    position:absolute;
+    right:18px;
+    top:18px;
+    width:48px;
+    height:48px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:12px;
+}
+
+.green{background:#e4f7ec;color:var(--success)}
+.red{background:#fde8e9;color:var(--danger)}
+.blue{background:#e8f1ff;color:var(--info)}
+.orange{background:#fff3df;color:var(--warning)}
+
+.card-title{
+    font-size:13px;
+    color:var(--muted);
+}
+
+.card-value{
+    margin-top:12px;
+    font-size:22px;
+    font-weight:bold;
+}
+
+.card small{
+    display:block;
+    margin-top:10px;
+    color:var(--muted);
+}
+
+/* ================= BOX ================= */
+
+.box{
+    background:white;
+    border-radius:14px;
+    padding:22px;
+    box-shadow:0 4px 20px rgba(0,0,0,.04);
+    margin-bottom:20px;
+}
+
+.box-title{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:18px;
+}
+
+.box-title h3{
+    color:var(--primary);
+}
+
+/* ================= TABLE ================= */
+
+.table-wrapper{
+    overflow-x:auto;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th{
+    background:#f5f8fb;
+    padding:13px;
+    text-align:left;
+    font-size:12px;
+    color:#5f6b76;
+}
+
+td{
+    padding:13px;
+    border-bottom:1px solid var(--border);
+    font-size:13px;
+}
+
+tr:hover td{
+    background:#fafcff;
+}
+
+/* ================= BUTTON ================= */
+
+.btn{
+    border:none;
+    padding:10px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:13px;
+    transition:.2s;
+}
+
+.btn-primary{
+    background:var(--primary2);
+    color:white;
+}
+
+.btn-success{
+    background:var(--success);
+    color:white;
+}
+
+.btn-danger{
+    background:var(--danger);
+    color:white;
+}
+
+.btn-warning{
+    background:var(--warning);
+    color:white;
+}
+
+.btn-light{
+    background:#eef2f6;
+    color:#333;
+}
+
+.btn:hover{
+    opacity:.85;
+}
+
+.btn-sm{
+    padding:7px 9px;
+    font-size:11px;
+}
+
+/* ================= TOOLBAR ================= */
+
+.toolbar{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:18px;
+    flex-wrap:wrap;
+}
+
+.search{
+    padding:10px 13px;
+    border:1px solid #dce3ea;
+    border-radius:8px;
+    min-width:250px;
+    outline:none;
+}
+
+/* ================= BADGE ================= */
+
+.badge{
+    padding:5px 9px;
+    border-radius:20px;
+    font-size:11px;
+    display:inline-block;
+}
+
+.badge-success{
+    background:#dff5e8;
+    color:var(--success);
+}
+
+.badge-danger{
+    background:#fde2e2;
+    color:var(--danger);
+}
+
+.badge-warning{
+    background:#fff0cf;
+    color:#9a6500;
+}
+
+.badge-info{
+    background:#e1efff;
+    color:var(--info);
+}
+
+/* ================= MODAL ================= */
+
+.modal{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.45);
+    z-index:3000;
+    align-items:center;
+    justify-content:center;
+    padding:15px;
+}
+
+.modal.show{
+    display:flex;
+}
+
+.modal-content{
+    width:min(700px,100%);
+    max-height:90vh;
+    overflow-y:auto;
+    background:white;
+    border-radius:14px;
+    padding:25px;
+}
+
+.modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+}
+
+.close{
+    cursor:pointer;
+    font-size:22px;
+}
+
+.form-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:15px;
+}
+
+.form-group{
+    display:flex;
+    flex-direction:column;
+    gap:7px;
+}
+
+.form-group.full{
+    grid-column:1/-1;
+}
+
+label{
+    font-size:13px;
+    font-weight:bold;
+}
+
+input,select,textarea{
+    padding:11px;
+    border:1px solid #dce3ea;
+    border-radius:8px;
+    outline:none;
+}
+
+textarea{
+    min-height:90px;
+    resize:vertical;
+}
+
+/* ================= REPORT ================= */
+
+.report-header{
+    text-align:center;
+    margin-bottom:25px;
+}
+
+.report-header h2{
+    color:var(--primary);
+}
+
+.summary{
+    background:#f5f8fb;
+    padding:14px;
+    border-radius:10px;
+    margin-top:15px;
+}
+
+/* ================= TOAST ================= */
+
+.toast{
+    position:fixed;
+    right:20px;
+    bottom:20px;
+    background:#222;
+    color:white;
+    padding:14px 18px;
+    border-radius:8px;
+    display:none;
+    z-index:5000;
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media(max-width:900px){
+    .sidebar{
+        transform:translateX(-100%);
+    }
+
+    .sidebar.show{
+        transform:translateX(0);
+    }
+
+    .main{
+        margin-left:0;
+    }
+
+    .mobile-menu{
+        display:block;
+    }
+}
+
+@media(max-width:600px){
+    .content{
+        padding:15px;
+    }
+
+    .form-grid{
+        grid-template-columns:1fr;
+    }
+
+    .search{
+        min-width:100%;
+    }
+
+    .page-header{
+        align-items:flex-start;
+        gap:12px;
+        flex-direction:column;
+    }
+
+    .user-text{
+        display:none;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<!-- ================= SIDEBAR ================= -->
+
+<aside class="sidebar" id="sidebar">
+
+<div class="brand">
+    <h2><i class="fa-solid fa-school"></i> SIMKU SD GIM</h2>
+    <p>Sistem Informasi Keuangan Sekolah</p>
+</div>
+
+<div class="menu-item active" onclick="dashboard()">
+    <i class="fa-solid fa-chart-line"></i>
+    <span>Dashboard</span>
+</div>
+
+<div class="menu-section">MASTER DATA</div>
+
+<div class="menu-item" onclick="toggleMenu('masterMenu')">
+    <i class="fa-solid fa-database"></i>
+    <span>Master Data</span>
+    <i class="fa-solid fa-chevron-down arrow"></i>
+</div>
+
+<div class="submenu" id="masterMenu">
+    <div onclick="openProfile()">Profil Sekolah</div>
+    <div onclick="openTable('Tahun Anggaran')">Tahun Anggaran</div>
+    <div onclick="openTable('Pengguna')">Pengguna</div>
+    <div onclick="openTable('Hak Akses')">Hak Akses</div>
+    <div onclick="openTable('Sumber Dana')">Sumber Dana</div>
+    <div onclick="openTable('Kategori Pendapatan')">Kategori Pendapatan</div>
+    <div onclick="openTable('Kategori Pengeluaran')">Kategori Pengeluaran</div>
+    <div onclick="openTable('Rekening/Kas')">Rekening/Kas</div>
+    <div onclick="openTable('Program/Kegiatan')">Program/Kegiatan</div>
+</div>
+
+<div class="menu-section">TRANSAKSI</div>
+
+<div class="menu-item" onclick="toggleMenu('transactionMenu')">
+    <i class="fa-solid fa-money-bill-transfer"></i>
+    <span>Transaksi</span>
+    <i class="fa-solid fa-chevron-down arrow"></i>
+</div>
+
+<div class="submenu" id="transactionMenu">
+    <div onclick="openTable('Pendapatan')">Pendapatan</div>
+    <div onclick="openTable('Pengeluaran')">Pengeluaran</div>
+    <div onclick="openTable('Transfer Kas/Rekening')">Transfer Kas/Rekening</div>
+    <div onclick="openTable('Penyesuaian')">Penyesuaian</div>
+    <div onclick="openTable('Jurnal')">Jurnal</div>
+</div>
+
+<div class="menu-section">KAS & BANK</div>
+
+<div class="menu-item" onclick="toggleMenu('cashMenu')">
+    <i class="fa-solid fa-building-columns"></i>
+    <span>Kas & Bank</span>
+    <i class="fa-solid fa-chevron-down arrow"></i>
+</div>
+
+<div class="submenu" id="cashMenu">
+    <div onclick="openCash('Kas Sekolah')">Kas Sekolah</div>
+    <div onclick="openCash('Bank')">Bank</div>
+    <div onclick="openTable('Mutasi')">Mutasi</div>
+    <div onclick="openTable('Rekonsiliasi')">Rekonsiliasi</div>
+</div>
+
+<div class="menu-section">ANGGARAN</div>
+
+<div class="menu-item" onclick="toggleMenu('budgetMenu')">
+    <i class="fa-solid fa-wallet"></i>
+    <span>Anggaran</span>
+    <i class="fa-solid fa-chevron-down arrow"></i>
+</div>
+
+<div class="submenu" id="budgetMenu">
+    <div onclick="openTable('Rencana Pendapatan')">Rencana Pendapatan</div>
+    <div onclick="openTable('Rencana Pengeluaran')">Rencana Pengeluaran</div>
+    <div onclick="openBudget()">Realisasi</div>
+    <div onclick="openBudget()">Anggaran vs Realisasi</div>
+</div>
+
+<div class="menu-section">LAPORAN</div>
+
+<div class="menu-item" onclick="toggleMenu('reportMenu')">
+    <i class="fa-solid fa-file-lines"></i>
+    <span>Laporan</span>
+    <i class="fa-solid fa-chevron-down arrow"></i>
+</div>
+
+<div class="submenu" id="reportMenu">
+    <div onclick="openReport('Laba/Rugi')">Laba/Rugi</div>
+    <div onclick="openReport('Arus Kas')">Arus Kas</div>
+    <div onclick="openReport('Buku Kas')">Buku Kas</div>
+    <div onclick="openReport('Pendapatan')">Pendapatan</div>
+    <div onclick="openReport('Pengeluaran')">Pengeluaran</div>
+    <div onclick="openReport('Neraca')">Neraca</div>
+    <div onclick="openReport('Anggaran vs Realisasi')">Anggaran vs Realisasi</div>
+    <div onclick="openReport('Rekap Tahunan')">Rekap Tahunan</div>
+</div>
+
+<div class="menu-section">BUKTI TRANSAKSI</div>
+
+<div class="menu-item" onclick="toggleMenu('proofMenu')">
+    <i class="fa-solid fa-file-invoice"></i>
+    <span>Bukti Transaksi</span>
+    <i class="fa-solid fa-chevron-down arrow"></i>
+</div>
+
+<div class="submenu" id="proofMenu">
+    <div onclick="openUpload()">Upload Bukti</div>
+    <div onclick="openTable('Kwitansi')">Kwitansi</div>
+    <div onclick="openTable('Invoice')">Invoice</div>
+</div>
+
+<div class="menu-section">APPROVAL</div>
+
+<div class="menu-item" onclick="toggleMenu('approvalMenu')">
+    <i class="fa-solid fa-check-double"></i>
+    <span>Approval</span>
+    <i class="fa-solid fa-chevron-down arrow"></i>
+</div>
+
+<div class="submenu" id="approvalMenu">
+    <div onclick="openApproval('Menunggu')">Menunggu Persetujuan</div>
+    <div onclick="openApproval('Disetujui')">Disetujui</div>
+    <div onclick="openApproval('Ditolak')">Ditolak</div>
+</div>
+
+<div class="menu-section">PENGATURAN</div>
+
+<div class="menu-item" onclick="toggleMenu('settingMenu')">
+    <i class="fa-solid fa-gear"></i>
+    <span>Pengaturan</span>
+    <i class="fa-solid fa-chevron-down arrow"></i>
+</div>
+
+<div class="submenu" id="settingMenu">
+    <div onclick="backupData()">Backup</div>
+    <div onclick="restorePage()">Restore</div>
+    <div onclick="openTable('Log Aktivitas')">Log Aktivitas</div>
+    <div onclick="systemSettings()">Pengaturan Sistem</div>
+</div>
+
+</aside>
+
+<!-- ================= MAIN ================= -->
+
+<main class="main">
+
+<header class="topbar">
+
+<div class="topbar-left">
+    <button class="mobile-menu" onclick="toggleSidebar()">
+        <i class="fa-solid fa-bars"></i>
+    </button>
+
+    <h3 id="topTitle">Dashboard</h3>
+</div>
+
+<div class="user-box">
+    <div>
+        <i class="fa-solid fa-bell"></i>
+    </div>
+
+    <div class="avatar">
+        <i class="fa-solid fa-user"></i>
+    </div>
+
+    <div class="user-text">
+        <strong>Administrator</strong><br>
+        <small>Admin Keuangan</small>
+    </div>
+</div>
+
+</header>
+
+<section class="content" id="app"></section>
+
+</main>
+
+<!-- ================= MODAL ================= -->
+
+<div class="modal" id="modal">
+    <div class="modal-content">
+
+        <div class="modal-header">
+            <h3 id="modalTitle">Tambah Data</h3>
+            <span class="close" onclick="closeModal()">&times;</span>
+        </div>
+
+        <form id="dataForm"></form>
+
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+/* =====================================================
+   DATABASE LOCAL STORAGE
+===================================================== */
+
+const DB_KEY = "SIM_KEUANGAN_SEKOLAH_V1";
+
+let db = JSON.parse(localStorage.getItem(DB_KEY)) || {
+
+profile:{
+    nama:"SMA NEGERI CONTOH",
+    npsn:"12345678",
+    alamat:"Jl. Pendidikan No. 10, Jakarta",
+    kepala:"Drs. Ahmad Wijaya",
+    telepon:"021-1234567",
+    email:"info@sekolah.sch.id"
+},
+
+"Tahun Anggaran":[
+    {id:1,tahun:"2026",status:"Aktif"},
+    {id:2,tahun:"2025",status:"Selesai"}
+],
+
+"Pengguna":[
+    {id:1,nama:"Administrator",username:"admin",role:"Super Admin",status:"Aktif"},
+    {id:2,nama:"Bendahara Sekolah",username:"bendahara",role:"Bendahara",status:"Aktif"},
+    {id:3,nama:"Kepala Sekolah",username:"kepsek",role:"Approver",status:"Aktif"}
+],
+
+"Hak Akses":[
+    {id:1,nama:"Super Admin",keterangan:"Akses seluruh sistem"},
+    {id:2,nama:"Bendahara",keterangan:"Mengelola transaksi keuangan"},
+    {id:3,nama:"Approver",keterangan:"Menyetujui transaksi"}
+],
+
+"Sumber Dana":[
+    {id:1,nama:"Dana BOS",keterangan:"Bantuan Operasional Sekolah"},
+    {id:2,nama:"Komite Sekolah",keterangan:"Sumbangan pendidikan"},
+    {id:3,nama:"Donasi",keterangan:"Dana bantuan/donatur"}
+],
+
+"Kategori Pendapatan":[
+    {id:1,nama:"Dana BOS"},
+    {id:2,nama:"Sumbangan Pendidikan"},
+    {id:3,nama:"Pendapatan Lain-lain"}
+],
+
+"Kategori Pengeluaran":[
+    {id:1,nama:"Belanja Pegawai"},
+    {id:2,nama:"Belanja Operasional"},
+    {id:3,nama:"Pemeliharaan"},
+    {id:4,nama:"Belanja ATK"}
+],
+
+"Rekening/Kas":[
+    {id:1,nama:"Kas Tunai Sekolah",jenis:"Kas",saldo:25000000},
+    {id:2,nama:"Bank BRI",jenis:"Bank",saldo:150000000},
+    {id:3,nama:"Bank BNI",jenis:"Bank",saldo:175000000}
+],
+
+"Program/Kegiatan":[
+    {id:1,nama:"Kegiatan Belajar Mengajar",anggaran:100000000},
+    {id:2,nama:"Pemeliharaan Sekolah",anggaran:75000000},
+    {id:3,nama:"Pengadaan Sarana",anggaran:50000000}
+],
+
+"Pendapatan":[
+    {
+        id:1,
+        tanggal:"2026-09-01",
+        kategori:"Dana BOS",
+        sumber:"Pemerintah",
+        keterangan:"Dana BOS Tahap III",
+        jumlah:150000000,
+        status:"Disetujui"
+    },
+    {
+        id:2,
+        tanggal:"2026-09-05",
+        kategori:"Sumbangan Pendidikan",
+        sumber:"Komite",
+        keterangan:"Sumbangan pendidikan",
+        jumlah:50000000,
+        status:"Disetujui"
+    },
+    {
+        id:3,
+        tanggal:"2026-09-08",
+        kategori:"Pendapatan Lain-lain",
+        sumber:"Donatur",
+        keterangan:"Bantuan donatur",
+        jumlah:50000000,
+        status:"Menunggu"
+    }
+],
+
+"Pengeluaran":[
+    {
+        id:1,
+        tanggal:"2026-09-02",
+        kategori:"Belanja Pegawai",
+        keterangan:"Honor tenaga pendidik",
+        jumlah:80000000,
+        status:"Disetujui"
+    },
+    {
+        id:2,
+        tanggal:"2026-09-04",
+        kategori:"Belanja Operasional",
+        keterangan:"Pembayaran listrik dan internet",
+        jumlah:45000000,
+        status:"Disetujui"
+    },
+    {
+        id:3,
+        tanggal:"2026-09-06",
+        kategori:"Pemeliharaan",
+        keterangan:"Perbaikan ruang kelas",
+        jumlah:30000000,
+        status:"Menunggu"
+    },
+    {
+        id:4,
+        tanggal:"2026-09-08",
+        kategori:"Belanja ATK",
+        keterangan:"Pembelian alat tulis kantor",
+        jumlah:20000000,
+        status:"Disetujui"
+    }
+],
+
+"Transfer Kas/Rekening":[
+    {id:1,tanggal:"2026-09-03",dari:"Kas Tunai Sekolah",ke:"Bank BRI",jumlah:10000000,status:"Disetujui"}
+],
+
+"Penyesuaian":[
+    {id:1,tanggal:"2026-09-07",keterangan:"Penyesuaian saldo kas",jumlah:500000,status:"Disetujui"}
+],
+
+"Jurnal":[
+    {id:1,tanggal:"2026-09-01",akun:"Kas",debit:150000000,kredit:0,keterangan:"Penerimaan Dana BOS"},
+    {id:2,tanggal:"2026-09-02",akun:"Belanja Pegawai",debit:80000000,kredit:0,keterangan:"Pembayaran Honor"}
+],
+
+"Mutasi":[
+    {id:1,tanggal:"2026-09-01",rekening:"Bank BRI",keterangan:"Dana masuk",masuk:150000000,keluar:0},
+    {id:2,tanggal:"2026-09-02",rekening:"Bank BRI",keterangan:"Pembayaran",masuk:0,keluar:45000000}
+],
+
+"Rekonsiliasi":[
+    {id:1,periode:"September 2026",rekening:"Bank BRI",saldoBuku:150000000,saldoBank:150000000,status:"Sesuai"}
+],
+
+"Rencana Pendapatan":[
+    {id:1,kategori:"Dana BOS",anggaran:200000000,realisasi:150000000},
+    {id:2,kategori:"Sumbangan Pendidikan",anggaran:75000000,realisasi:50000000}
+],
+
+"Rencana Pengeluaran":[
+    {id:1,kategori:"Belanja Pegawai",anggaran:100000000,realisasi:80000000},
+    {id:2,kategori:"Belanja Operasional",anggaran:75000000,realisasi:45000000},
+    {id:3,kategori:"Pemeliharaan",anggaran:50000000,realisasi:30000000}
+],
+
+"Kwitansi":[
+    {id:1,nomor:"KWT-001",tanggal:"2026-09-02",penerima:"Tenaga Pendidik",jumlah:80000000,status:"Tersedia"}
+],
+
+"Invoice":[
+    {id:1,nomor:"INV-001",tanggal:"2026-09-04",vendor:"PLN/Internet",jumlah:45000000,status:"Tersedia"}
+],
+
+"Log Aktivitas":[
+    {id:1,waktu:"2026-09-09 08:00",pengguna:"Administrator",aktivitas:"Login ke sistem"},
+    {id:2,waktu:"2026-09-09 08:10",pengguna:"Bendahara",aktivitas:"Menambahkan transaksi"}
+]
+
+};
+
+function saveDB(){
+    localStorage.setItem(DB_KEY,JSON.stringify(db));
+}
+
+/* =====================================================
+   UTILITIES
+===================================================== */
+
+function rupiah(number){
+    return new Intl.NumberFormat("id-ID",{
+        style:"currency",
+        currency:"IDR",
+        maximumFractionDigits:0
+    }).format(Number(number||0));
+}
+
+function formatDate(date){
+    if(!date) return "-";
+    return new Date(date).toLocaleDateString("id-ID");
+}
+
+function toast(message){
+    const t=document.getElementById("toast");
+    t.innerText=message;
+    t.style.display="block";
+
+    setTimeout(()=>{
+        t.style.display="none";
+    },2500);
+}
+
+function badge(status){
+
+    let cls="badge-info";
+
+    if(status==="Disetujui" || status==="Aktif" || status==="Sesuai" || status==="Tersedia")
+        cls="badge-success";
+
+    if(status==="Ditolak")
+        cls="badge-danger";
+
+    if(status==="Menunggu")
+        cls="badge-warning";
+
+    return `<span class="badge ${cls}">${status||"-"}</span>`;
+}
+
+function setTitle(title){
+    document.getElementById("topTitle").innerText=title;
+}
+
+function toggleSidebar(){
+    document.getElementById("sidebar").classList.toggle("show");
+}
+
+function toggleMenu(id){
+    document.getElementById(id).classList.toggle("open");
+}
+
+/* =====================================================
+   DASHBOARD
+===================================================== */
+
+function total(data,key="jumlah"){
+    return (data||[]).reduce((a,b)=>a+Number(b[key]||0),0);
+}
+
+function dashboard(){
+
+    setTitle("Dashboard");
+
+    const income=total(db["Pendapatan"]);
+    const expense=total(db["Pengeluaran"]);
+    const balance=income-expense;
+
+    const waiting=[
+        ...db["Pendapatan"],
+        ...db["Pengeluaran"]
+    ].filter(x=>x.status==="Menunggu").length;
+
+    document.getElementById("app").innerHTML=`
+
+    <div class="page-header">
+        <div>
+            <h1>Dashboard Keuangan Sekolah</h1>
+            <p>Ringkasan informasi keuangan sekolah.</p>
+        </div>
+
+        <button class="btn btn-light" onclick="resetDemo()">
+            <i class="fa-solid fa-rotate"></i> Reset Data Demo
+        </button>
+    </div>
+
+    <div class="cards">
+
+        <div class="card">
+            <div class="card-icon green">
+                <i class="fa-solid fa-arrow-trend-up"></i>
+            </div>
+
+            <div class="card-title">Total Pendapatan</div>
+            <div class="card-value">${rupiah(income)}</div>
+            <small>Total seluruh pendapatan</small>
+        </div>
+
+        <div class="card">
+            <div class="card-icon red">
+                <i class="fa-solid fa-arrow-trend-down"></i>
+            </div>
+
+            <div class="card-title">Total Pengeluaran</div>
+            <div class="card-value">${rupiah(expense)}</div>
+            <small>Total seluruh pengeluaran</small>
+        </div>
+
+        <div class="card">
+            <div class="card-icon blue">
+                <i class="fa-solid fa-wallet"></i>
+            </div>
+
+            <div class="card-title">Surplus / Saldo</div>
+            <div class="card-value">${rupiah(balance)}</div>
+            <small>Kondisi keuangan saat ini</small>
+        </div>
+
+        <div class="card">
+            <div class="card-icon orange">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+
+            <div class="card-title">Menunggu Approval</div>
+            <div class="card-value">${waiting}</div>
+            <small>Transaksi membutuhkan persetujuan</small>
+        </div>
+
+    </div>
+
+    <div class="box">
+
+        <div class="box-title">
+  
+    </div>
+
+    <div class="box">
+
+        <div class="box-title">
+            <h3>Transaksi Terbaru</h3>
+        </div>
+
+        <div class="table-wrapper">
+
+        <table>
+
+        <thead>
+            <tr>
+                <th>Tanggal</th>
+                <th>Jenis</th>
+                <th>Keterangan</th>
+                <th>Jumlah</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+        ${[
+            ...db["Pendapatan"].map(x=>({...x,jenis:"Pendapatan"})),
+            ...db["Pengeluaran"].map(x=>({...x,jenis:"Pengeluaran"}))
+        ]
+        .sort((a,b)=>new Date(b.tanggal)-new Date(a.tanggal))
+        .slice(0,6)
+        .map(x=>`
+            <tr>
+                <td>${formatDate(x.tanggal)}</td>
+                <td>${x.jenis}</td>
+                <td>${x.keterangan}</td>
+                <td>${rupiah(x.jumlah)}</td>
+                <td>${badge(x.status)}</td>
+            </tr>
+        `).join("")}
+
+        </tbody>
+
+        </table>
+
+        </div>
+
+    </div>
+    `;
+
+    setTimeout(renderChart,100);
+}
+
+function renderChart(){
+
+    const ctx=document.getElementById("financeChart");
+
+    if(!ctx)return;
+
+    new Chart(ctx,{
+        type:"bar",
+        data:{
+            labels:["Pendapatan","Pengeluaran","Surplus"],
+            datasets:[{
+                label:"Keuangan Sekolah",
+                data:[
+                    total(db["Pendapatan"]),
+                    total(db["Pengeluaran"]),
+                    total(db["Pendapatan"])-total(db["Pengeluaran"])
+                ]
+            }]
+        },
+        options:{
+            responsive:true,
+            plugins:{
+                legend:{display:false}
+            }
+        }
+    });
+}
+
+/* =====================================================
+   GENERIC TABLE
+===================================================== */
+
+function openTable(name){
+
+    setTitle(name);
+
+    const data=db[name]||[];
+
+    let columns=[];
+
+    if(data.length>0)
+        columns=Object.keys(data[0]).filter(x=>x!=="id");
+
+    document.getElementById("app").innerHTML=`
+
+    <div class="page-header">
+
+        <div>
+            <h1>${name}</h1>
+            <p>Kelola data ${name.toLowerCase()}.</p>
+        </div>
+
+        <button class="btn btn-primary"
+        onclick="openForm('${name}')">
+            <i class="fa-solid fa-plus"></i>
+            Tambah Data
+        </button>
+
+    </div>
+
+    <div class="box">
+
+        <div class="toolbar">
+
+            <input class="search"
+            placeholder="Cari data..."
+            onkeyup="searchTable(this.value,'${name}')">
+
+        </div>
+
+        <div class="table-wrapper">
+
+        <table>
+
+        <thead>
+            <tr>
+                ${columns.map(c=>`<th>${c}</th>`).join("")}
+                <th>Aksi</th>
+            </tr>
+        </thead>
+
+        <tbody id="tableBody">
+
+            ${renderRows(name,data,columns)}
+
+        </tbody>
+
+        </table>
+
+        </div>
+
+    </div>
+    `;
+}
+
+function renderRows(name,data,columns){
+
+    return data.map(row=>`
+
+        <tr>
+
+        ${columns.map(c=>{
+
+            let value=row[c];
+
+            if(["jumlah","saldo","anggaran","realisasi","masuk","keluar","debit","kredit","saldoBuku","saldoBank"].includes(c))
+                value=rupiah(value);
+
+            if(c==="tanggal")
+                value=formatDate(value);
+
+            if(c==="status")
+                value=badge(value);
+
+            return `<td>${value??"-"}</td>`;
+
+        }).join("")}
+
+        <td>
+            <button class="btn btn-light btn-sm"
+            onclick="openForm('${name}',${row.id})">
+                <i class="fa-solid fa-pen"></i>
+            </button>
+
+            <button class="btn btn-danger btn-sm"
+            onclick="deleteData('${name}',${row.id})">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </td>
+
+        </tr>
+
+    `).join("");
+}
+
+function searchTable(keyword,name){
+
+    const data=db[name]||[];
+
+    const filtered=data.filter(row=>
+        Object.values(row).join(" ")
+        .toLowerCase()
+        .includes(keyword.toLowerCase())
+    );
+
+    const columns=data.length
+        ?Object.keys(data[0]).filter(x=>x!=="id")
+        :[];
+
+    document.getElementById("tableBody").innerHTML=
+        renderRows(name,filtered,columns);
+}
+
+/* =====================================================
+   FORM CRUD
+===================================================== */
+
+function openForm(name,id=null){
+
+    let item=id
+        ?db[name].find(x=>x.id===id)
+        :null;
+
+    document.getElementById("modal").classList.add("show");
+
+    document.getElementById("modalTitle").innerText=
+        id ? `Edit ${name}` : `Tambah ${name}`;
+
+    let fields=item
+        ?Object.keys(item).filter(x=>x!=="id")
+        :getDefaultFields(name);
+
+    document.getElementById("dataForm").innerHTML=`
+
+        <div class="form-grid">
+
+        ${fields.map(field=>{
+
+            let value=item?.[field]??"";
+
+            let type="text";
+
+            if(field==="tanggal")
+                type="date";
+
+            if([
+                "jumlah","saldo","anggaran","realisasi",
+                "masuk","keluar","debit","kredit",
+                "saldoBuku","saldoBank"
+            ].includes(field))
+                type="number";
+
+            if(field==="keterangan" || field==="alamat")
+                type="textarea";
+
+            return `
+
+            <div class="form-group
+            ${field==="keterangan"||field==="alamat"?"full":""}">
+
+                <label>${field}</label>
+
+                ${
+                    type==="textarea"
+                    ?`<textarea name="${field}">${value}</textarea>`
+                    :`<input type="${type}" name="${field}"
+                      value="${value}">`
+                }
+
+            </div>
+            `;
+
+        }).join("")}
+
+        </div>
+
+        <br>
+
+        <button type="button"
+        class="btn btn-success"
+        onclick="saveForm('${name}',${id||"null"})">
+
+            <i class="fa-solid fa-save"></i>
+            Simpan
+
+        </button>
+
+        <button type="button"
+        class="btn btn-light"
+        onclick="closeModal()">
+
+            Batal
+
+        </button>
+    `;
+}
+
+function getDefaultFields(name){
+
+    const map={
+
+        "Tahun Anggaran":["tahun","status"],
+
+        "Pengguna":["nama","username","role","status"],
+
+        "Hak Akses":["nama","keterangan"],
+
+        "Sumber Dana":["nama","keterangan"],
+
+        "Kategori Pendapatan":["nama"],
+
+        "Kategori Pengeluaran":["nama"],
+
+        "Rekening/Kas":["nama","jenis","saldo"],
+
+        "Program/Kegiatan":["nama","anggaran"],
+
+        "Pendapatan":[
+            "tanggal","kategori","sumber",
+            "keterangan","jumlah","status"
+        ],
+
+        "Pengeluaran":[
+            "tanggal","kategori",
+            "keterangan","jumlah","status"
+        ],
+
+        "Transfer Kas/Rekening":[
+            "tanggal","dari","ke",
+            "jumlah","status"
+        ],
+
+        "Penyesuaian":[
+            "tanggal","keterangan",
+            "jumlah","status"
+        ],
+
+        "Jurnal":[
+            "tanggal","akun","debit",
+            "kredit","keterangan"
+        ],
+
+        "Mutasi":[
+            "tanggal","rekening","keterangan",
+            "masuk","keluar"
+        ],
+
+        "Rekonsiliasi":[
+            "periode","rekening",
+            "saldoBuku","saldoBank","status"
+        ],
+
+        "Rencana Pendapatan":[
+            "kategori","anggaran","realisasi"
+        ],
+
+        "Rencana Pengeluaran":[
+            "kategori","anggaran","realisasi"
+        ],
+
+        "Kwitansi":[
+            "nomor","tanggal",
+            "penerima","jumlah","status"
+        ],
+
+        "Invoice":[
+            "nomor","tanggal",
+            "vendor","jumlah","status"
+        ],
+
+        "Log Aktivitas":[
+            "waktu","pengguna","aktivitas"
+        ]
+    };
+
+    return map[name]||["nama","keterangan"];
+}
+
+function saveForm(name,id){
+
+    const form=document.getElementById("dataForm");
+
+    const fd=new FormData(form);
+
+    let obj={};
+
+    fd.forEach((value,key)=>{
+
+        if([
+            "jumlah","saldo","anggaran","realisasi",
+            "masuk","keluar","debit","kredit",
+            "saldoBuku","saldoBank"
+        ].includes(key))
+            obj[key]=Number(value);
+
+        else
+            obj[key]=value;
+
+    });
+
+    if(id){
+
+        const index=db[name].findIndex(x=>x.id===id);
+
+        obj.id=id;
+
+        db[name][index]=obj;
+
+        logActivity(`Mengubah data ${name}`);
+
+        toast("Data berhasil diperbarui");
+
+    }else{
+
+        obj.id=Date.now();
+
+        if(!db[name])db[name]=[];
+
+        db[name].push(obj);
+
+        logActivity(`Menambahkan data ${name}`);
+
+        toast("Data berhasil ditambahkan");
+    }
+
+    saveDB();
+
+    closeModal();
+
+    openTable(name);
+}
+
+function deleteData(name,id){
+
+    if(!confirm("Hapus data ini?"))return;
+
+    db[name]=db[name].filter(x=>x.id!==id);
+
+    saveDB();
+
+    logActivity(`Menghapus data ${name}`);
+
+    openTable(name);
+
+    toast("Data berhasil dihapus");
+}
+
+function closeModal(){
+    document.getElementById("modal").classList.remove("show");
+}
+
+/* =====================================================
+   PROFILE
+===================================================== */
+
+function openProfile(){
+
+    setTitle("Profil Sekolah");
+
+    const p=db.profile;
+
+    document.getElementById("app").innerHTML=`
+
+    <div class="page-header">
+
+        <div>
+            <h1>Profil Sekolah</h1>
+            <p>Informasi identitas sekolah.</p>
+        </div>
+
+        <button class="btn btn-primary" onclick="editProfile()">
+            <i class="fa-solid fa-pen"></i>
+            Edit Profil
+        </button>
+
+    </div>
+
+    <div class="box">
+
+        <div class="table-wrapper">
+
+        <table>
+
+        <tbody>
+            <tr><th>Nama Sekolah</th><td>${p.nama}</td></tr>
+            <tr><th>NPSN</th><td>${p.npsn}</td></tr>
+            <tr><th>Alamat</th><td>${p.alamat}</td></tr>
+            <tr><th>Kepala Sekolah</th><td>${p.kepala}</td></tr>
+            <tr><th>Telepon</th><td>${p.telepon}</td></tr>
+            <tr><th>Email</th><td>${p.email}</td></tr>
+        </tbody>
+
+        </table>
+
+        </div>
+
+    </div>
+    `;
+}
+
+function editProfile(){
+
+    document.getElementById("modal").classList.add("show");
+
+    document.getElementById("modalTitle").innerText="Edit Profil Sekolah";
+
+    const p=db.profile;
+
+    document.getElementById("dataForm").innerHTML=`
+
+    <div class="form-grid">
+
+    ${Object.keys(p).map(k=>`
+
+        <div class="form-group ${k==="alamat"?"full":""}">
+
+        <label>${k}</label>
+
+        ${
+            k==="alamat"
+            ?`<textarea name="${k}">${p[k]}</textarea>`
+            :`<input name="${k}" value="${p[k]}">`
+        }
+
+        </div>
+
+    `).join("")}
+
+    </div>
+
+    <br>
+
+    <button class="btn btn-success"
+    type="button"
+    onclick="saveProfile()">
+        Simpan
+    </button>
+    `;
+}
+
+function saveProfile(){
+
+    const fd=new FormData(document.getElementById("dataForm"));
+
+    fd.forEach((v,k)=>db.profile[k]=v);
+
+    saveDB();
+
+    closeModal();
+
+    openProfile();
+
+    toast("Profil sekolah berhasil diperbarui");
+}
+
+/* =====================================================
+   KAS & BANK
+===================================================== */
+
+function openCash(type){
+
+    setTitle(type);
+
+    const accounts=db["Rekening/Kas"]
+        .filter(x=>type==="Kas Sekolah"
+            ?x.jenis==="Kas"
+            :x.jenis==="Bank");
+
+    document.getElementById("app").innerHTML=`
+
+    <div class="page-header">
+        <div>
+            <h1>${type}</h1>
+            <p>Informasi saldo ${type.toLowerCase()}.</p>
+        </div>
+    </div>
+
+    <div class="cards">
+
+    ${accounts.map(x=>`
+
+        <div class="card">
+
+            <div class="card-icon blue">
+                <i class="fa-solid fa-building-columns"></i>
+            </div>
+
+            <div class="card-title">${x.nama}</div>
+
+            <div class="card-value">
+                ${rupiah(x.saldo)}
+            </div>
+
+            <small>${x.jenis}</small>
+
+        </div>
+
+    `).join("")}
+
+    </div>
+
+    <div class="box">
+
+        <div class="box-title">
+            <h3>Daftar Rekening</h3>
+
+            <button class="btn btn-primary"
+            onclick="openTable('Rekening/Kas')">
+                Kelola Rekening
+            </button>
+        </div>
+
+    </div>
+    `;
+}
+
+/* =====================================================
+   ANGGARAN
+===================================================== */
+
+function openBudget(){
+
+    setTitle("Anggaran vs Realisasi");
+
+    const income=db["Rencana Pendapatan"];
+    const expense=db["Rencana Pengeluaran"];
+
+    const incomeBudget=total(income,"anggaran");
+    const incomeReal=total(income,"realisasi");
+
+    const expenseBudget=total(expense,"anggaran");
+    const expenseReal=total(expense,"realisasi");
+
+    document.getElementById("app").innerHTML=`
+
+    <div class="page-header">
+        <div>
+            <h1>Anggaran vs Realisasi</h1>
+            <p>Perbandingan rencana dan realisasi keuangan.</p>
+        </div>
+    </div>
+
+    <div class="cards">
+
+        <div class="card">
+            <div class="card-title">Anggaran Pendapatan</div>
+            <div class="card-value">${rupiah(incomeBudget)}</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Realisasi Pendapatan</div>
+            <div class="card-value">${rupiah(incomeReal)}</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Anggaran Pengeluaran</div>
+            <div class="card-value">${rupiah(expenseBudget)}</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Realisasi Pengeluaran</div>
+            <div class="card-value">${rupiah(expenseReal)}</div>
+        </div>
+
+    </div>
+
+    <div class="box">
+
+        <h3 style="margin-bottom:15px">
+            Rencana Pendapatan
+        </h3>
+
+        ${budgetTable(income)}
+
+    </div>
+
+    <div class="box">
+
+        <h3 style="margin-bottom:15px">
+            Rencana Pengeluaran
+        </h3>
+
+        ${budgetTable(expense)}
+
+    </div>
+    `;
+}
+
+function budgetTable(data){
+
+    return `
+    <div class="table-wrapper">
+
+    <table>
+
+    <thead>
+        <tr>
+            <th>Kategori</th>
+            <th>Anggaran</th>
+            <th>Realisasi</th>
+            <th>Persentase</th>
+        </tr>
+    </thead>
+
+    <tbody>
+
+    ${data.map(x=>`
+
+        <tr>
+            <td>${x.kategori}</td>
+            <td>${rupiah(x.anggaran)}</td>
+            <td>${rupiah(x.realisasi)}</td>
+            <td>
+                ${x.anggaran
+                    ?Math.round(x.realisasi/x.anggaran*100)
+                    :0}%
+            </td>
+        </tr>
+
+    `).join("")}
+
+    </tbody>
+
+    </table>
+
+    </div>
+    `;
+}
+
+/* =====================================================
+   LAPORAN
+===================================================== */
+
+function openReport(type){
+
+    setTitle("Laporan "+type);
+
+    const income=total(db["Pendapatan"]);
+    const expense=total(db["Pengeluaran"]);
+    const balance=income-expense;
+
+    if(type==="Laba/Rugi"){
+
+        document.getElementById("app").innerHTML=`
+
+        <div class="page-header">
+            <div>
+                <h1>Laporan Laba / Rugi</h1>
+                <p>Ringkasan pendapatan dan pengeluaran sekolah.</p>
+            </div>
+
+            <button class="btn btn-primary" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Cetak
+            </button>
+        </div>
+
+        <div class="box">
+
+        <div class="report-header">
+            <h2>${db.profile.nama}</h2>
+            <p>LAPORAN LABA / RUGI</p>
+            <p>Periode Tahun Anggaran 2026</p>
+        </div>
+
+        <table>
+
+        <thead>
+            <tr>
+                <th>Keterangan</th>
+                <th>Jumlah</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            <tr>
+                <td colspan="2"><strong>PENDAPATAN</strong></td>
+            </tr>
+
+            ${db["Pendapatan"].map(x=>`
+                <tr>
+                    <td>${x.keterangan}</td>
+                    <td>${rupiah(x.jumlah)}</td>
+                </tr>
+            `).join("")}
+
+            <tr>
+                <th>TOTAL PENDAPATAN</th>
+                <th>${rupiah(income)}</th>
+            </tr>
+
+            <tr>
+                <td colspan="2"><br></td>
+            </tr>
+
+            <tr>
+                <td colspan="2"><strong>PENGELUARAN</strong></td>
+            </tr>
+
+            ${db["Pengeluaran"].map(x=>`
+                <tr>
+                    <td>${x.keterangan}</td>
+                    <td>${rupiah(x.jumlah)}</td>
+                </tr>
+            `).join("")}
+
+            <tr>
+                <th>TOTAL PENGELUARAN</th>
+                <th>${rupiah(expense)}</th>
+            </tr>
+
+            <tr>
+                <td colspan="2"><br></td>
+            </tr>
+
+            <tr style="background:#eef6ff">
+                <th>SURPLUS / DEFISIT</th>
+                <th>${rupiah(balance)}</th>
+            </tr>
+
+        </tbody>
+
+        </table>
+
+        </div>
+        `;
+
+        return;
+    }
+
+    if(type==="Arus Kas"){
+
+        document.getElementById("app").innerHTML=`
+
+        <div class="page-header">
+            <div>
+                <h1>Laporan Arus Kas</h1>
+                <p>Pergerakan kas masuk dan keluar.</p>
+            </div>
+        </div>
+
+        <div class="cards">
+            <div class="card">
+                <div class="card-title">Kas Masuk</div>
+                <div class="card-value">${rupiah(income)}</div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Kas Keluar</div>
+                <div class="card-value">${rupiah(expense)}</div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Arus Kas Bersih</div>
+                <div class="card-value">${rupiah(balance)}</div>
+            </div>
+        </div>
+
+        <div class="box">
+            <canvas id="cashChart"></canvas>
+        </div>
+        `;
+
+        setTimeout(()=>{
+            new Chart(document.getElementById("cashChart"),{
+                type:"line",
+                data:{
+                    labels:["Kas Masuk","Kas Keluar","Saldo"],
+                    datasets:[{
+                        label:"Arus Kas",
+                        data:[income,expense,balance]
+                    }]
+                }
+            });
+        },100);
+
+        return;
+    }
+
+    if(type==="Buku Kas"){
+        openTable("Mutasi");
+        return;
+    }
+
+    if(type==="Pendapatan"){
+        openTable("Pendapatan");
+        return;
+    }
+
+    if(type==="Pengeluaran"){
+        openTable("Pengeluaran");
+        return;
+    }
+
+    if(type==="Neraca"){
+
+        const assets=total(db["Rekening/Kas"],"saldo");
+
+        document.getElementById("app").innerHTML=`
+
+        <div class="page-header">
+            <div>
+                <h1>Neraca</h1>
+                <p>Posisi keuangan sekolah.</p>
+            </div>
+        </div>
+
+        <div class="box">
+
+        <table>
+            <thead>
+                <tr>
+                    <th>AKTIVA</th>
+                    <th>JUMLAH</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+            ${db["Rekening/Kas"].map(x=>`
+                <tr>
+                    <td>${x.nama}</td>
+                    <td>${rupiah(x.saldo)}</td>
+                </tr>
+            `).join("")}
+
+            <tr>
+                <th>TOTAL AKTIVA</th>
+                <th>${rupiah(assets)}</th>
+            </tr>
+
+            </tbody>
+        </table>
+
+        <br>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>EKUITAS / SALDO</th>
+                    <th>JUMLAH</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td>Saldo Bersih</td>
+                    <td>${rupiah(assets)}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        </div>
+        `;
+
+        return;
+    }
+
+    if(type==="Anggaran vs Realisasi"){
+        openBudget();
+        return;
+    }
+
+    if(type==="Rekap Tahunan"){
+
+        document.getElementById("app").innerHTML=`
+
+        <div class="page-header">
+            <div>
+                <h1>Rekap Tahunan</h1>
+                <p>Rekapitulasi keuangan tahun 2026.</p>
+            </div>
+        </div>
+
+        <div class="box">
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Uraian</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td>Total Pendapatan</td>
+                    <td>${rupiah(income)}</td>
+                </tr>
+
+                <tr>
+                    <td>Total Pengeluaran</td>
+                    <td>${rupiah(expense)}</td>
+                </tr>
+
+                <tr>
+                    <th>Surplus / Defisit</th>
+                    <th>${rupiah(balance)}</th>
+                </tr>
+            </tbody>
+        </table>
+
+        </div>
+        `;
+
+        return;
+    }
+
+    document.getElementById("app").innerHTML=`
+        <div class="box">
+            <h2>Laporan ${type}</h2>
+            <p>Data laporan tersedia.</p>
+        </div>
+    `;
+}
+
+/* =====================================================
+   APPROVAL
+===================================================== */
+
+function openApproval(status){
+
+    setTitle("Approval - "+status);
+
+    const data=[
+        ...db["Pendapatan"].map(x=>({...x,jenis:"Pendapatan"})),
+        ...db["Pengeluaran"].map(x=>({...x,jenis:"Pengeluaran"}))
+    ].filter(x=>x.status===status);
+
+    document.getElementById("app").innerHTML=`
+
+    <div class="page-header">
+        <div>
+            <h1>${status} Persetujuan</h1>
+            <p>Daftar transaksi dengan status ${status.toLowerCase()}.</p>
+        </div>
+    </div>
+
+    <div class="box">
+
+    <div class="table-wrapper">
+
+    <table>
+
+    <thead>
+        <tr>
+            <th>Tanggal</th>
+            <th>Jenis</th>
+            <th>Keterangan</th>
+            <th>Jumlah</th>
+            <th>Status</th>
+            <th>Aksi</th>
+        </tr>
+    </thead>
+
+    <tbody>
+
+    ${data.map(x=>`
+
+        <tr>
+            <td>${formatDate(x.tanggal)}</td>
+            <td>${x.jenis}</td>
+            <td>${x.keterangan}</td>
+            <td>${rupiah(x.jumlah)}</td>
+            <td>${badge(x.status)}</td>
+
+            <td>
+
+            ${
+                status==="Menunggu"
+                ?`
+                <button class="btn btn-success btn-sm"
+                onclick="approve('${x.jenis}',${x.id},'Disetujui')">
+                    Setujui
+                </button>
+
+                <button class="btn btn-danger btn-sm"
+                onclick="approve('${x.jenis}',${x.id},'Ditolak')">
+                    Tolak
+                </button>
+                `
+                :`<span>-</span>`
+            }
+
+            </td>
+        </tr>
+
+    `).join("")}
+
+    </tbody>
+
+    </table>
+
+    </div>
+
+    </div>
+    `;
+}
+
+function approve(type,id,status){
+
+    const item=db[type].find(x=>x.id===id);
+
+    if(item)item.status=status;
+
+    saveDB();
+
+    logActivity(`${status} transaksi ${type}`);
+
+    toast(`Transaksi ${status.toLowerCase()}`);
+
+    openApproval(status);
+}
+
+/* =====================================================
+   UPLOAD BUKTI
+===================================================== */
+
+function openUpload(){
+
+    setTitle("Upload Bukti Transaksi");
+
+    document.getElementById("app").innerHTML=`
+
+    <div class="page-header">
+        <div>
+            <h1>Upload Bukti Transaksi</h1>
+            <p>Tambahkan bukti transaksi berupa dokumen atau gambar.</p>
+        </div>
+    </div>
+
+    <div class="box">
+
+        <div class="form-group">
+
+            <label>Jenis Bukti</label>
+
+            <select id="proofType">
+                <option>Kwitansi</option>
+                <option>Invoice</option>
+                <option>Bukti Pembayaran</option>
+            </select>
+
+        </div>
+
+        <br>
+
+        <div class="form-group">
+
+            <label>Pilih File</label>
+
+            <input type="file" id="proofFile">
+
+        </div>
+
+        <br>
+
+        <button class="btn btn-primary" onclick="saveProof()">
+            <i class="fa-solid fa-upload"></i>
+            Upload Bukti
+        </button>
+
+        <div class="summary">
+
+            <strong>Catatan:</strong><br>
+
+            Versi LocalStorage menyimpan informasi file.
+            Untuk aplikasi produksi, file sebaiknya disimpan
+            menggunakan server/database atau cloud storage.
+
+        </div>
+
+    </div>
+    `;
+}
+
+function saveProof(){
+
+    const file=document.getElementById("proofFile").files[0];
+
+    if(!file){
+        toast("Pilih file terlebih dahulu");
+        return;
+    }
+
+    const type=document.getElementById("proofType").value;
+
+    if(!db[type])db[type]=[];
+
+    db[type].push({
+        id:Date.now(),
+        nomor:"DOC-"+Date.now(),
+        tanggal:new Date().toISOString().split("T")[0],
+        penerima:file.name,
+        jumlah:0,
+        status:"Tersedia"
+    });
+
+    saveDB();
+
+    logActivity("Upload bukti transaksi "+file.name);
+
+    toast("Informasi bukti berhasil disimpan");
+
+    openUpload();
+}
+
+/* =====================================================
+   BACKUP & RESTORE
+===================================================== */
+
+function backupData(){
+
+    const dataStr=JSON.stringify(db,null,2);
+
+    const blob=new Blob([dataStr],{
+        type:"application/json"
+    });
+
+    const url=URL.createObjectURL(blob);
+
+    const a=document.createElement("a");
+
+    a.href=url;
+
+    a.download="backup-sim-keuangan.json";
+
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+    toast("Backup berhasil dibuat");
+
+    logActivity("Melakukan backup data");
+}
+
+function restorePage(){
+
+    setTitle("Restore Data");
+
+    document.getElementById("app").innerHTML=`
+
+    <div class="page-header">
+        <div>
+            <h1>Restore Data</h1>
+            <p>Pulihkan data dari file backup JSON.</p>
+        </div>
+    </div>
+
+    <div class="box">
+
+        <div class="form-group">
+
+            <label>Pilih File Backup (.json)</label>
+
+            <input type="file"
+            id="restoreFile"
+            accept=".json">
+
+        </div>
+
+        <br>
+
+        <button class="btn btn-warning"
+        onclick="restoreData()">
+
+            <i class="fa-solid fa-rotate-left"></i>
+            Restore Data
+
+        </button>
+
+    </div>
+    `;
+}
+
+function restoreData(){
+
+    const file=document.getElementById("restoreFile").files[0];
+
+    if(!file){
+        toast("Pilih file backup");
+        return;
+    }
+
+    const reader=new FileReader();
+
+    reader.onload=function(e){
+
+        try{
+
+            db=JSON.parse(e.target.result);
+
+            saveDB();
+
+            toast("Restore berhasil");
+
+            dashboard();
+
+        }catch(err){
+
+            toast("File backup tidak valid");
+        }
+    };
+
+    reader.readAsText(file);
+}
+
+/* =====================================================
+   SYSTEM SETTINGS
+===================================================== */
+
+function systemSettings(){
+
+    setTitle("Pengaturan Sistem");
+
+    document.getElementById("app").innerHTML=`
+
+    <div class="page-header">
+        <div>
+            <h1>Pengaturan Sistem</h1>
+            <p>Konfigurasi umum aplikasi.</p>
+        </div>
+    </div>
+
+    <div class="box">
+
+        <div class="form-grid">
+
+            <div class="form-group">
+                <label>Nama Sistem</label>
+                <input value="SIM KEUANGAN SEKOLAH">
+            </div>
+
+            <div class="form-group">
+                <label>Tahun Aktif</label>
+                <select>
+                    <option>2026</option>
+                    <option>2025</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Format Mata Uang</label>
+                <input value="IDR - Rupiah">
+            </div>
+
+            <div class="form-group">
+                <label>Bahasa</label>
+                <input value="Indonesia">
+            </div>
+
+        </div>
+
+        <br>
+
+        <button class="btn btn-success"
+        onclick="toast('Pengaturan berhasil disimpan')">
+            Simpan Pengaturan
+        </button>
+
+    </div>
+    `;
+}
+
+/* =====================================================
+   LOG
+===================================================== */
+
+function logActivity(activity){
+
+    if(!db["Log Aktivitas"])
+        db["Log Aktivitas"]=[];
+
+    db["Log Aktivitas"].unshift({
+        id:Date.now(),
+        waktu:new Date().toLocaleString("id-ID"),
+        pengguna:"Administrator",
+        aktivitas:activity
+    });
+
+    saveDB();
+}
+
+/* =====================================================
+   RESET
+===================================================== */
+
+function resetDemo(){
+
+    if(!confirm("Reset seluruh data ke kondisi awal?"))
+        return;
+
+    localStorage.removeItem(DB_KEY);
+
+    location.reload();
+}
+
+/* =====================================================
+   INITIAL LOAD
+===================================================== */
+
+dashboard();
+
+</script>
+
+</body>
+</html>

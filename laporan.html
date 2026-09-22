@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laporan - SIMKU SD GIM</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        .print-only-table, .print-only-block, .print-only-flex { display: none; }
+
+        @media print {
+            .sidebar, .topbar, .btn, .mobile-menu, .user-box, .toolbar, .filter-box, .no-print, .modal { display: none !important; }
+            .main { margin-left: 0 !important; width: 100% !important; padding: 0 !important; }
+            body { background: white; font-family: 'Times New Roman', Times, serif; }
+            .box { box-shadow: none; border: none; padding: 0; margin: 0; }
+            .page-header { display: none; }
+            
+            .report-header { text-align: center; margin-bottom: 20px; line-height: 1.5; }
+            .report-header h2 { font-size: 18px; margin-bottom: 2px; text-transform: uppercase; }
+            .report-header p { margin: 0; font-size: 14px; }
+            
+            table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+            th, td { border: 1px solid #000; padding: 6px 8px; font-size: 12px; color: black !important; }
+            th { background: #f0f0f0 !important; text-align: center; }
+            
+            .print-only-table { display: table-row-group !important; }
+            .print-only-block { display: block !important; }
+            .print-only-flex { display: flex !important; justify-content: space-between; margin-top: 30px; font-size: 12px; color: black; page-break-inside: avoid; }
+            
+            .print-footer-table td { font-weight: bold; }
+            .signature-box { text-align: center; width: 250px; }
+            .signature-box.right { text-align: center; }
+            .signature-space { height: 70px; }
+            .saldo-rincian { font-size: 12px; font-weight: bold; margin-top: 15px; line-height: 1.6; }
+        }
+
+        /* Detail Modal UI */
+        .custom-detail-table { width: 100%; border-collapse: collapse; }
+        .custom-detail-table td { padding: 10px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+        .custom-detail-table td:first-child { color: var(--muted); width: 130px; font-weight: 500; }
+        .custom-detail-table tr:last-child td { border-bottom: none; }
+    </style>
+</head>
+<body>
+    <!-- ================= SIDEBAR UNIVERSAL ================= -->
+    <aside class="sidebar" id="sidebar">
+        <div class="brand">
+            <h2><i class="fa-solid fa-school"></i> SIMKU SD GIM</h2>
+            <p>Sistem Informasi Keuangan Sekolah</p>
+        </div>
+
+        <div class="menu-item" onclick="window.location.href='dashboard.html'" style="cursor:pointer;">
+            <i class="fa-solid fa-chart-line"></i>
+            <span>Dashboard</span>
+        </div>
+
+        <div class="menu-section">MASTER DATA</div>
+        <div class="menu-item" onclick="toggleMenu('masterMenu')">
+            <i class="fa-solid fa-database"></i>
+            <span>Master Data</span>
+            <i class="fa-solid fa-chevron-down arrow"></i>
+        </div>
+        <div class="submenu" id="masterMenu">
+            <div class="submenu-item" onclick="navigateMenu('master.html', 'Profil Sekolah')">Profil Sekolah</div>
+            <div class="submenu-item" onclick="navigateMenu('master.html', 'Tahun Anggaran')">Tahun Anggaran</div>
+            <div class="submenu-item" onclick="navigateMenu('master.html', 'Pengguna')">Pengguna</div>
+            <div class="submenu-item" onclick="navigateMenu('master.html', 'Hak Akses')">Hak Akses</div>
+        </div>
+
+        <div class="menu-section">TRANSAKSI</div>
+        <div class="menu-item" onclick="toggleMenu('transactionMenu')">
+            <i class="fa-solid fa-money-bill-transfer"></i>
+            <span>Transaksi</span>
+            <i class="fa-solid fa-chevron-down arrow"></i>
+        </div>
+        <div class="submenu" id="transactionMenu">
+            <div class="submenu-item" onclick="navigateMenu('transaksi.html', 'Pendapatan')">Pendapatan</div>
+            <div class="submenu-item" onclick="navigateMenu('transaksi.html', 'Pengeluaran')">Pengeluaran</div>
+            <div class="submenu-item" onclick="navigateMenu('transaksi.html', 'Transfer Kas/Rekening')">Transfer Kas/Rekening</div>
+        </div>
+
+        <div class="menu-section">ANGGARAN</div>
+        <div class="menu-item" onclick="toggleMenu('budgetMenu')">
+            <i class="fa-solid fa-wallet"></i>
+            <span>Anggaran</span>
+            <i class="fa-solid fa-chevron-down arrow"></i>
+        </div>
+        <div class="submenu" id="budgetMenu">
+            <div class="submenu-item" onclick="navigateMenu('anggaran.html', 'Rencana Anggaran')">Rencana Anggaran</div>
+            <div class="submenu-item" onclick="navigateMenu('anggaran.html', 'Rencana Pengeluaran')">Rencana Pengeluaran</div>
+            <div class="submenu-item" onclick="navigateMenu('anggaran.html', 'Realisasi')">Realisasi</div>
+        </div>
+
+        <div class="menu-section">APPROVAL</div>
+        <div class="menu-item" onclick="toggleMenu('approvalMenu')">
+            <i class="fa-solid fa-check-double"></i>
+            <span>Approval</span>
+            <i class="fa-solid fa-chevron-down arrow"></i>
+        </div>
+        <div class="submenu" id="approvalMenu">
+            <div class="submenu-item" onclick="navigateMenu('approval.html', 'Menunggu')">Menunggu Persetujuan</div>
+            <div class="submenu-item" onclick="navigateMenu('approval.html', 'Disetujui')">Disetujui</div>
+            <div class="submenu-item" onclick="navigateMenu('approval.html', 'Ditolak')">Ditolak</div>
+        </div>
+
+        <div class="menu-section">LAPORAN</div>
+        <div class="menu-item" onclick="toggleMenu('reportMenu')">
+            <i class="fa-solid fa-file-lines"></i>
+            <span>Laporan</span>
+            <i class="fa-solid fa-chevron-down arrow"></i>
+        </div>
+        <div class="submenu" id="reportMenu">
+            <div class="submenu-item" onclick="navigateMenu('laporan.html', 'Laba/Rugi')">Laba/Rugi</div>
+            <div class="submenu-item" onclick="navigateMenu('laporan.html', 'Arus Kas')">Arus Kas</div>
+            <div class="submenu-item" onclick="navigateMenu('laporan.html', 'Buku Kas Umum')">Buku Kas Umum</div>
+        </div>
+
+        <!-- MENU PENGATURAN BARU -->
+        <div class="menu-section">PENGATURAN</div>
+        <div class="menu-item active" onclick="toggleMenu('settingMenu')" style="cursor:pointer;">
+            <i class="fa-solid fa-gear"></i>
+            <span>Pengaturan</span>
+            <i class="fa-solid fa-chevron-down arrow"></i>
+        </div>
+        <div class="submenu open" id="settingMenu">
+            <div class="submenu-item" onclick="navigateMenu('pengaturan.html', 'Legger')">Legger</div>
+            <div class="submenu-item" onclick="navigateMenu('pengaturan.html', 'Backup')">Backup</div>
+            <div class="submenu-item" onclick="navigateMenu('pengaturan.html', 'Restore')">Restore</div>
+            <div class="submenu-item" onclick="navigateMenu('pengaturan.html', 'Log Aktivitas')">Log Aktivitas</div>
+        </div>
+
+        <div class="menu-section">AKUN</div>
+        <div class="menu-item" onclick="logout()" style="cursor:pointer;">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Logout</span>
+        </div>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('show')"><i class="fa-solid fa-bars"></i></button>
+                <h3 id="topTitle">Laporan</h3>
+            </div>
+            <div class="user-box">
+                <div class="user-text">
+                    <strong id="userDisplayName">User</strong><br>
+                    <small id="userDisplayRole">Admin</small>
+                </div>
+            </div>
+        </header>
+
+        <section class="content" id="app"></section>
+    </main>
+
+    <!-- MODAL FILTER CETAK -->
+    <div class="modal" id="printModal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>Filter Cetak Laporan</h3>
+                <span class="close" onclick="closePrintModal()">&times;</span>
+            </div>
+            <div class="form-group">
+                <label>Dari Tanggal</label>
+                <input type="date" id="printStart">
+            </div>
+            <br>
+            <div class="form-group">
+                <label>Sampai Tanggal</label>
+                <input type="date" id="printEnd">
+            </div>
+            <br>
+            <div class="form-group" id="printActionDateGroup" style="display:none;">
+                <label>Tanggal Cetak Dokumen</label>
+                <input type="date" id="printActionDate">
+            </div>
+            <br>
+            <button class="btn btn-primary" style="width: 100%;" onclick="processPrint()">
+                <i class="fa-solid fa-print"></i> Cetak
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL DETAIL TRANSAKSI UI BARU -->
+    <div class="modal" id="detailModal">
+        <div class="modal-content" style="max-width: 450px; padding: 0; overflow: hidden; border-radius: 12px;">
+            <div style="background: var(--primary); color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 16px;"><i class="fa-solid fa-file-invoice-dollar" style="margin-right:8px;"></i> Rincian Data Transaksi</h3>
+                <span class="close" style="color: white; opacity: 0.8; font-size: 24px;" onclick="closeDetailModal()">&times;</span>
+            </div>
+            <div id="detailContent" style="padding: 25px; background: white;">
+                <!-- Diisi oleh Javascript -->
+            </div>
+            <div style="padding: 15px 25px; background: #f9fafb; border-top: 1px solid var(--border); text-align: right;">
+                <button class="btn btn-light" style="border: 1px solid #dce3ea;" onclick="closeDetailModal()">Tutup</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+
+    <script src="db.js"></script>
+    <script src="sidebar.js"></script>
+    <script>
+        const targetMenu = sessionStorage.getItem("targetMenu") || 'Laba/Rugi';
+        renderSidebar(targetMenu);
+        
+        const user = checkAuth("admin"); 
+        document.getElementById("userDisplayName").innerText = user.nama;
+        let currentReportType = "";
+        let globalExportData = [];
+
+        function closeMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar.classList.contains('show')) sidebar.classList.remove('show');
+        }
+
+        function formatTanggalIndo(dateStr) {
+            if(!dateStr) return "-";
+            const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            const d = new Date(dateStr);
+            return `${d.getDate().toString().padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        }
+
+        // ================= FITUR HAPUS & DETAIL DATA LR =================
+        // ================= FITUR HAPUS & DETAIL DATA LR =================
+        function deleteLRData(tabel, id) {
+            Swal.fire({
+                title: 'Hapus Data Transaksi',
+                text: "Data yang sudah dihapus tidak dapat dikembalikan",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="fa-solid fa-trash"></i> Ya',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    db[tabel] = db[tabel].filter(x => x.id !== id);
+                    saveDB();
+                    applyFilterLR(); 
+                    
+                    Swal.fire({
+                        title: 'Terhapus!',
+                        text: 'Data transaksi berhasil dihapus dari laporan.',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
+            });
+        }
+
+        function closeDetailModal() {
+            document.getElementById("detailModal").classList.remove("show");
+        }
+
+        function detailLRData(tabel, id) {
+            let data = db[tabel].find(x => x.id === id);
+            if(!data) return;
+            
+            let statusBadge = data.status === 'Tunai' ? '<span class="badge badge-success">Tunai</span>' : '<span class="badge badge-warning">Transfer</span>';
+            
+            let html = `<table class="custom-detail-table">
+                <tr><td>Tanggal</td><td><strong style="color:var(--text);">${formatTanggalIndo(data.tanggal)}</strong></td></tr>
+                <tr><td>Status</td><td>${statusBadge}</td></tr>`;
+            
+            if(tabel === "Pendapatan") {
+                html += `
+                <tr><td>Kategori</td><td><strong style="color:var(--text);">${data.kategori}</strong></td></tr>
+                <tr><td>Catatan</td><td><strong style="color:var(--text);">${data.keterangan || '-'}</strong></td></tr>
+                <tr><td>Total Nominal</td><td><strong style="color:var(--success); font-size:18px;">${rupiah(data.jumlah)}</strong></td></tr>`;
+            } else {
+                html += `
+                <tr><td>Uraian Pengeluaran</td><td><strong style="color:var(--text);">${data.uraian}</strong></td></tr>
+                <tr><td>Volume (Qty)</td><td><strong style="color:var(--text);">${data.volume || '-'}</strong></td></tr>
+                <tr><td>Total Nominal</td><td><strong style="color:var(--danger); font-size:18px;">${rupiah(data.total)}</strong></td></tr>`;
+            }
+            html += `</table>`;
+            
+            document.getElementById("detailContent").innerHTML = html;
+            document.getElementById("detailModal").classList.add("show");
+        }
+
+        // ================= FITUR EXPORT EXCEL =================
+        function exportExcelLR() {
+            if (globalExportData.length === 0) { toast("Tidak ada data untuk di-export!"); return; }
+            let dataForExcel = globalExportData.map(x => ({
+                "Tanggal": formatDate(x.tanggal), "Kategori": x.kategori,
+                "Status": x.status || "-", "Nominal": x.nominal, "Catatan": x.catatan
+            }));
+            const ws = XLSX.utils.json_to_sheet(dataForExcel);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "LabaRugi");
+            XLSX.writeFile(wb, "Laporan_Laba_Rugi.xlsx");
+            toast("Laporan Excel berhasil diunduh");
+        }
+
+        // ================= FITUR CETAK PDF =================
+        function openPrintModal(type) {
+            currentReportType = type;
+            document.getElementById("printModal").classList.add("show");
+            if(type === "Buku Kas Umum") {
+                document.getElementById("printActionDateGroup").style.display = "block";
+                document.getElementById("printActionDate").value = new Date().toISOString().split("T")[0];
+            } else {
+                document.getElementById("printActionDateGroup").style.display = "none";
+            }
+        }
+
+        function closePrintModal() { document.getElementById("printModal").classList.remove("show"); }
+
+        function processPrint() {
+            let start = document.getElementById("printStart").value;
+            let end = document.getElementById("printEnd").value;
+            let pDate = document.getElementById("printActionDate").value;
+            closePrintModal();
+
+            if (currentReportType === "Laba/Rugi") renderLabaRugi(start, end);
+            else if (currentReportType === "Buku Kas Umum") renderBKU(start, end, pDate);
+            
+            setTimeout(() => { window.print(); }, 500);
+        }
+
+        // ================= ROUTER LAPORAN =================
+        function openReport(type) {
+            closeMobileSidebar();
+            document.getElementById("topTitle").innerText = "Laporan " + type;
+            if (type === "Laba/Rugi") renderLabaRugi();
+            else if (type === "Arus Kas") renderArusKas();
+            else if (type === "Buku Kas Umum") renderBKU();
+        }
+
+        function applyFilterLR() {
+            let start = document.getElementById('lrStart').value;
+            let end = document.getElementById('lrEnd').value;
+            renderLabaRugi(start, end);
+        }
+
+        // ================= RENDER LABA RUGI =================
+        function renderLabaRugi(startDate = null, endDate = null) {
+            let pSekolah = db.profile || { nama: "SD GIM BEKASI" };
+            
+            let dataPendapatan = db["Pendapatan"] || [];
+            let dataPengeluaran = db["Rencana Pengeluaran"] || []; 
+
+            if(startDate && endDate) {
+                dataPendapatan = dataPendapatan.filter(x => x.tanggal >= startDate && x.tanggal <= endDate);
+                dataPengeluaran = dataPengeluaran.filter(x => x.tanggal >= startDate && x.tanggal <= endDate);
+            }
+
+            let totalPend = total(dataPendapatan, "jumlah");
+            let totalPeng = total(dataPengeluaran, "total");
+            let surplus = totalPend - totalPeng;
+
+            // Kalkulasi Tunai & Transfer Berdasarkan Status Transaksi
+            let pendTunai = total(dataPendapatan.filter(x => x.status === "Tunai"), "jumlah");
+            let pendTransfer = total(dataPendapatan.filter(x => x.status === "Transfer"), "jumlah");
+            let pengTunai = total(dataPengeluaran.filter(x => x.status === "Tunai"), "total");
+            let pengTransfer = total(dataPengeluaran.filter(x => x.status === "Transfer"), "total");
+
+            let saldoTunai = pendTunai - pengTunai;
+            let saldoTransfer = pendTransfer - pengTransfer;
+
+            let combinedLR = [];
+            dataPendapatan.forEach(x => {
+                combinedLR.push({ 
+                    id: x.id, tabel: "Pendapatan", tanggal: x.tanggal, 
+                    kategori: 'Pendapatan', nominal: Number(x.jumlah) || 0, 
+                    catatan: x.keterangan || x.kategori, status: x.status 
+                });
+            });
+            dataPengeluaran.forEach(x => {
+                combinedLR.push({ 
+                    id: x.id, tabel: "Rencana Pengeluaran", tanggal: x.tanggal, 
+                    kategori: 'Pengeluaran', nominal: Number(x.total) || 0, 
+                    catatan: x.uraian, status: x.status 
+                });
+            });
+            combinedLR.sort((a,b) => new Date(a.tanggal) - new Date(b.tanggal));
+            
+            globalExportData = combinedLR;
+
+            let filterText = (startDate && endDate) ? `${formatTanggalIndo(startDate)} - ${formatTanggalIndo(endDate)}` : `Semua Periode`;
+
+            document.getElementById("app").innerHTML=`
+            <div class="page-header">
+                <div><h1>Laporan Laba / Rugi</h1><p>Ringkasan data keuangan dan transaksi.</p></div>
+            </div>
+
+            <div class="box filter-box" style="padding: 15px; margin-bottom: 20px;">
+                <div style="display:flex; gap: 15px; align-items:center; flex-wrap: wrap;">
+                    <div style="font-size: 13px; font-weight: bold; color: var(--muted);">Filter Tanggal:</div>
+                    <input type="date" id="lrStart" class="search" style="min-width: 150px;" value="${startDate||''}">
+                    <span>-</span>
+                    <input type="date" id="lrEnd" class="search" style="min-width: 150px;" value="${endDate||''}">
+                    <button class="btn btn-primary" onclick="applyFilterLR()">Filter</button>
+                </div>
+            </div>
+            
+            <!-- Summary Dashboard Card (Termasuk Saldo Tunai & Transfer) -->
+            <div class="box filter-box" style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; padding: 15px;">
+                <div style="background: #f4f7fb; padding: 15px 20px; border-radius: 8px; border: 1px solid #e7edf4; flex: 1; min-width: 180px;">
+                    <p style="color:var(--muted); font-size:13px; margin-bottom: 5px;">Laba Bersih</p>
+                    <h2 style="color: var(--primary);">${rupiah(surplus)}</h2>
+                </div>
+                <div style="background: #f4f7fb; padding: 15px 20px; border-radius: 8px; border: 1px solid #e7edf4; flex: 1; min-width: 180px;">
+                    <p style="color:var(--muted); font-size:13px; margin-bottom: 5px;">Total Pendapatan</p>
+                    <h2 style="color: var(--success);">${rupiah(totalPend)}</h2>
+                </div>
+                <div style="background: #f4f7fb; padding: 15px 20px; border-radius: 8px; border: 1px solid #e7edf4; flex: 1; min-width: 180px;">
+                    <p style="color:var(--muted); font-size:13px; margin-bottom: 5px;">Total Pengeluaran</p>
+                    <h2 style="color: var(--danger);">${rupiah(totalPeng)}</h2>
+                </div>
+                <div style="background: #f4f7fb; padding: 15px 20px; border-radius: 8px; border: 1px solid #e7edf4; flex: 1; min-width: 180px;">
+                    <p style="color:var(--muted); font-size:13px; margin-bottom: 5px;">Saldo Tunai</p>
+                    <h2 style="color: #198754;">${rupiah(saldoTunai)}</h2>
+                </div>
+                <div style="background: #f4f7fb; padding: 15px 20px; border-radius: 8px; border: 1px solid #e7edf4; flex: 1; min-width: 180px;">
+                    <p style="color:var(--muted); font-size:13px; margin-bottom: 5px;">Saldo Transfer</p>
+                    <h2 style="color: #f39c12;">${rupiah(saldoTransfer)}</h2>
+                </div>
+            </div>
+
+            <div class="box">
+                <div class="report-header print-only-block">
+                    <h2>${pSekolah.nama}</h2>
+                    <p style="font-weight: bold;">LAPORAN LABA / RUGI</p>
+                    <p style="color: var(--muted); font-size: 13px;">Periode: ${filterText}</p>
+                </div>
+
+                <div class="toolbar" style="justify-content: space-between;">
+                    <div style="font-weight: bold; color: var(--primary); margin-top:10px;">${filterText}</div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-success" onclick="exportExcelLR()"><i class="fa-solid fa-file-excel"></i> Export</button>
+                        <button class="btn btn-primary" onclick="openPrintModal('Laba/Rugi')"><i class="fa-solid fa-print"></i> Cetak</button>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;">Tanggal</th>
+                                <th style="text-align:left;">Kategori</th>
+                                <th style="text-align:right;">Nominal</th>
+                                <th style="text-align:center;">Status</th>
+                                <th style="text-align:left;">Catatan</th>
+                                <th class="no-print" style="text-align:center;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${combinedLR.length === 0 ? `<tr><td colspan="6" style="text-align:center;">Tidak ada data</td></tr>` : ''}
+                            ${combinedLR.map(x => `
+                                <tr>
+                                    <td>${formatDate(x.tanggal)}</td>
+                                    <td><span style="color: ${x.kategori==='Pendapatan' ? 'var(--success)' : 'var(--danger)'}; font-weight:bold;">${x.kategori}</span></td>
+                                    <td style="text-align:right;">${rupiah(x.nominal)}</td>
+                                    <td style="text-align:center;">
+                                        <span class="badge ${x.status === 'Tunai' ? 'badge-success' : 'badge-warning'}">${x.status || '-'}</span>
+                                    </td>
+                                    <td>${x.catatan}</td>
+                                    <td class="no-print" style="text-align:center;">
+                                        <button class="btn btn-light btn-sm" onclick="detailLRData('${x.tabel}',${x.id})">Detail</button>
+                                        <button class="btn btn-light btn-sm" style="background:#fff5f5; border:1px solid #ffcccc; color:#dc3545;" onclick="deleteLRData('${x.tabel}',${x.id})">Hapus</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+        }
+
+        // ================= RENDER BUKU KAS UMUM =================
+        function renderBKU(startDate = null, endDate = null, printDate = null) {
+            let pSekolah = db.profile || { nama: "SD GIM BEKASI", kepala: "Kepala Sekolah", bendahara: "Bendahara" };
+
+            // 1. Persiapkan Struktur Data
+            let pendapatan = (db["Pendapatan"] || []).map(x => ({
+                tanggal: x.tanggal, kode: "PEN-" + x.id.toString().slice(-4), uraian: x.keterangan || x.kategori,
+                penerimaan: Number(x.jumlah) || 0, pengeluaran: 0, status: x.status || "Tunai"
+            }));
+
+            let pengeluaran = (db["Rencana Pengeluaran"] || []).map(x => ({
+                tanggal: x.tanggal, kode: x.nomor, uraian: x.uraian,
+                penerimaan: 0, pengeluaran: Number(x.total) || 0, status: x.status || "Tunai"
+            }));
+
+            let bkuData = [...pendapatan, ...pengeluaran];
+            bkuData.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
+
+            // Variabel Akumulasi
+            let penerimaanLalu = 0, pengeluaranLalu = 0, penerimaanIni = 0, pengeluaranIni = 0;
+            let saldoTunai = 0, saldoBank = 0, saldoBerjalan = 0;
+            let displayData = [];
+
+            bkuData.forEach(row => {
+                if(row.status === "Tunai") { saldoTunai += row.penerimaan; saldoTunai -= row.pengeluaran; } 
+                else { saldoBank += row.penerimaan; saldoBank -= row.pengeluaran; }
+
+                if (startDate && row.tanggal < startDate) {
+                    penerimaanLalu += row.penerimaan; pengeluaranLalu += row.pengeluaran;
+                    saldoBerjalan = penerimaanLalu - pengeluaranLalu;
+                } else if ((!startDate || row.tanggal >= startDate) && (!endDate || row.tanggal <= endDate)) {
+                    penerimaanIni += row.penerimaan; pengeluaranIni += row.pengeluaran;
+                    saldoBerjalan += row.penerimaan; saldoBerjalan -= row.pengeluaran;
+                    row.saldo = saldoBerjalan;
+                    displayData.push(row);
+                }
+            });
+
+            let totalSemuaPenerimaan = penerimaanLalu + penerimaanIni;
+            let totalSemuaPengeluaran = pengeluaranLalu + pengeluaranIni;
+            let sisaKasAkhir = totalSemuaPenerimaan - totalSemuaPengeluaran;
+            
+            // LOGIKA BARU: Tarik Tahun Anggaran Aktif
+            let thnAktifData = (db["Tahun Anggaran"] || []).find(x => x.status === "Aktif");
+            let tahunAktif = thnAktifData ? thnAktifData.tahun : new Date().getFullYear();
+
+            // LOGIKA BARU: Ganti "Semua Periode" menjadi "Periode Tahun Anggaran X"
+            let filterText = (startDate && endDate) ? `Periode ${formatTanggalIndo(startDate)} s/d ${formatTanggalIndo(endDate)}` : `Periode Tahun Anggaran ${tahunAktif}`;
+            let tglCetak = printDate ? formatTanggalIndo(printDate) : formatTanggalIndo(new Date().toISOString().split("T")[0]);
+
+            document.getElementById("app").innerHTML=`
+            <div class="page-header">
+                <div><h1>Buku Kas Umum (BKU)</h1><p>Catatan kronologis penerimaan dan pengeluaran</p></div>
+                <button class="btn btn-primary" onclick="openPrintModal('Buku Kas Umum')"><i class="fa-solid fa-print"></i> Cetak</button>
+            </div>
+            
+            <div class="box">
+                <!-- LOGIKA BARU: Tambahkan class 'print-only-block' agar disembunyikan di layar UI -->
+                <div class="report-header print-only-block">
+                    <h2>${pSekolah.nama}</h2>
+                    <p style="font-weight: bold;">BUKU KAS UMUM</p>
+                    <p style="color: var(--muted); font-size: 13px;">${filterText}</p>
+                </div>
+                
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;">Tanggal</th>
+                                <th style="text-align:left;">No. Bukti</th>
+                                <th style="text-align:left;">Uraian</th>
+                                <th style="text-align:right;">Penerimaan</th>
+                                <th style="text-align:right;">Pengeluaran</th>
+                                <th style="text-align:right;">Saldo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${displayData.length === 0 ? `<tr><td colspan="6" style="text-align:center;">Tidak ada data pada periode ini.</td></tr>` : ''}
+                            ${displayData.map(x => `
+                                <tr>
+                                    <td>${formatDate(x.tanggal)}</td>
+                                    <td>${x.kode || '-'}</td>
+                                    <td>${x.uraian}</td>
+                                    <td style="text-align:right;">${x.penerimaan > 0 ? rupiah(x.penerimaan) : ''}</td>
+                                    <td style="text-align:right;">${x.pengeluaran > 0 ? rupiah(x.pengeluaran) : ''}</td>
+                                    <td style="text-align:right;">${rupiah(x.saldo)}</td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                        
+                        <tbody class="print-only-table print-footer-table">
+                            <tr>
+                                <td colspan="3" style="text-align:left;">Jumlah periode ini</td>
+                                <td style="text-align:right;">${rupiah(penerimaanIni)}</td>
+                                <td style="text-align:right;">${rupiah(pengeluaranIni)}</td>
+                                <td style="text-align:right;"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="text-align:left;">Jumlah sampai periode lalu</td>
+                                <td style="text-align:right;">${rupiah(penerimaanLalu)}</td>
+                                <td style="text-align:right;">${rupiah(pengeluaranLalu)}</td>
+                                <td style="text-align:right;"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="text-align:left;">Jumlah semua sampai periode ini</td>
+                                <td style="text-align:right;">${rupiah(totalSemuaPenerimaan)}</td>
+                                <td style="text-align:right;">${rupiah(totalSemuaPengeluaran)}</td>
+                                <td style="text-align:right;"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="5" style="text-align:left;">Sisa Kas</td>
+                                <td style="text-align:right;">${rupiah(sisaKasAkhir)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="saldo-rincian print-only-block">
+                    Terdiri dari:<br>
+                    a. Tunai &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Rp. ${rupiah(saldoTunai)}<br>
+                    b. Bank &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Rp. ${rupiah(saldoBank)}
+                </div>
+
+                <div class="signature-section print-only-flex">
+                    <div class="signature-box">
+                        <p>Mengetahui,</p>
+                        <p>KEPALA SEKOLAH</p>
+                        <div class="signature-space"></div>
+                        <p style="font-weight: bold; text-decoration: underline;">${pSekolah.kepala}</p>
+                    </div>
+                    <div class="signature-box right">
+                        <p>Kota Bekasi, ${tglCetak}</p>
+                        <p>BENDAHARA</p>
+                        <div class="signature-space"></div>
+                        <p style="font-weight: bold; text-decoration: underline;">${pSekolah.bendahara}</p>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // ================= RENDER ARUS KAS =================
+        function renderArusKas() {
+            let totalPend = total(db["Pendapatan"], "jumlah");
+            let totalPeng = total(db["Rencana Pengeluaran"], "total");
+            let surplus = totalPend - totalPeng;
+
+            document.getElementById("app").innerHTML=`
+            <div class="page-header">
+                <div><h1>Laporan Arus Kas</h1><p>Visualisasi pergerakan kas masuk dan keluar</p></div>
+            </div>
+
+            <div class="cards">
+                <div class="card">
+                    <div class="card-icon green"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                    <div class="card-title">Total Kas Masuk</div>
+                    <div class="card-value">${rupiah(totalPend)}</div>
+                </div>
+                <div class="card">
+                    <div class="card-icon red"><i class="fa-solid fa-arrow-trend-down"></i></div>
+                    <div class="card-title">Total Kas Keluar</div>
+                    <div class="card-value">${rupiah(totalPeng)}</div>
+                </div>
+                <div class="card">
+                    <div class="card-icon blue"><i class="fa-solid fa-wallet"></i></div>
+                    <div class="card-title">Arus Kas Bersih</div>
+                    <div class="card-value">${rupiah(surplus)}</div>
+                </div>
+            </div>
+
+            <div class="box" style="padding: 30px;">
+                <canvas id="cashChart" style="max-height: 400px;"></canvas>
+            </div>
+            `;
+
+            setTimeout(() => {
+                const ctx = document.getElementById("cashChart");
+                if(ctx) {
+                    new Chart(ctx, {
+                        type: "line",
+                        data: {
+                            labels: ["Kas Masuk", "Kas Keluar", "Saldo Bersih"],
+                            datasets: [{
+                                label: "Pergerakan Kas", data: [totalPend, totalPeng, surplus],
+                                borderColor: "#1d5d9b", backgroundColor: "rgba(29, 93, 155, 0.1)",
+                                borderWidth: 3, pointBackgroundColor: "#198754",
+                                pointRadius: 5, tension: 0.4, fill: true
+                            }]
+                        },
+                        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+                    });
+                }
+            }, 100);
+        }
+
+        const target = sessionStorage.getItem("targetMenu");
+        if(target === "Arus Kas") openReport("Arus Kas");
+        else if (target === "Buku Kas Umum") openReport("Buku Kas Umum");
+        else openReport("Laba/Rugi");
+        sessionStorage.removeItem("targetMenu"); 
+    </script>
+</body>
+</html>

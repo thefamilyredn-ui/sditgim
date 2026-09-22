@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Approval - SIMKU SD GIM</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <!-- Library SweetAlert2 untuk Popup -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+    <!-- ================= SIDEBAR UNIVERSAL ================= -->
+    <aside class="sidebar" id="sidebar">
+
+    </aside>
+
+    <!-- ================= MAIN ================= -->
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('show')"><i class="fa-solid fa-bars"></i></button>
+                <h3 id="topTitle">Approval</h3>
+            </div>
+            <div class="user-box">
+                <div class="user-text">
+                    <strong id="userDisplayName">User</strong><br>
+                    <small id="userDisplayRole">Admin</small>
+                </div>
+            </div>
+        </header>
+
+        <section class="content" id="app"></section>
+    </main>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="db.js"></script>
+    <script src="sidebar.js"></script>
+    <script>
+        const targetMenu = sessionStorage.getItem("targetMenu") || 'Menunggu';
+        renderSidebar(targetMenu);
+        
+        const user = checkAuth("admin"); 
+        document.getElementById("userDisplayName").innerText = user.nama;
+        let currentApprovalType = "Menunggu";
+
+        function closeMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar.classList.contains('show')) sidebar.classList.remove('show');
+        }
+
+        // ================= LOGIKA APPROVAL (SETUJUI / TOLAK) =================
+        function prosesApproval(tabel, id, status, reason = "") {
+            let index = db[tabel].findIndex(x => x.id === id);
+            if(index !== -1) {
+                db[tabel][index].approval_status = status;
+                if(reason) db[tabel][index].alasan_tolak = reason;
+                saveDB();
+                
+                Swal.fire({
+                    title: 'Berhasil!',
+                    text: `Transaksi telah ${status.toLowerCase()}`,
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+                
+                openApproval(currentApprovalType); 
+            }
+        }
+
+        function promptTolak(tabel, id) {
+            Swal.fire({
+                title: 'Tolak Transaksi',
+                html: '<p style="font-size:14px; color:var(--muted);">Silakan masukkan alasan penolakan transaksi ini</p>',
+                input: 'textarea',
+                inputPlaceholder: 'Ketik alasan disini',
+                showCancelButton: true,
+                confirmButtonText: '<i class="fa-solid fa-paper-plane"></i> Kirim',
+                confirmButtonColor: '#dc3545',
+                cancelButtonText: 'Batal',
+                reverseButtons: true,
+                inputValidator: (value) => {
+                    if (!value.trim()) {
+                        return 'Alasan penolakan tidak boleh kosong'
+                    }
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    prosesApproval(tabel, id, 'Ditolak', result.value);
+                }
+            });
+        }
+
+        function lihatAlasan(alasan) {
+            Swal.fire({
+                title: 'Alasan Ditolak',
+                text: alasan || 'Tidak ada alasan yang dilampirkan',
+                icon: 'info',
+                confirmButtonColor: 'var(--primary)',
+                confirmButtonText: 'Tutup'
+            });
+        }
+
+        // ================= RENDER HALAMAN APPROVAL =================
+        function openApproval(type) {
+            closeMobileSidebar();
+            currentApprovalType = type;
+            document.getElementById("topTitle").innerText = "Approval - " + type;
+
+            // Mengumpulkan data dari Pendapatan & Pengeluaran
+            let dataList = [];
+            (db["Pendapatan"] || []).forEach(x => {
+                dataList.push({
+                    id: x.id, tabel: "Pendapatan", tanggal: x.tanggal,
+                    kode: "PEN-" + x.id.toString().slice(-4),
+                    keterangan: x.keterangan || x.kategori,
+                    jumlah: Number(x.jumlah) || 0,
+                    approval_status: x.approval_status || "Menunggu",
+                    alasan_tolak: x.alasan_tolak || ""
+                });
+            });
+
+            (db["Rencana Pengeluaran"] || []).forEach(x => {
+                dataList.push({
+                    id: x.id, tabel: "Rencana Pengeluaran", tanggal: x.tanggal,
+                    kode: x.nomor || "PGL-" + x.id.toString().slice(-4),
+                    keterangan: x.uraian,
+                    jumlah: Number(x.total) || 0,
+                    approval_status: x.approval_status || "Menunggu",
+                    alasan_tolak: x.alasan_tolak || ""
+                });
+            });
+
+            // Urutkan berdasarkan tanggal terbaru
+            dataList.sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal));
+
+            // Saring berdasarkan status (Menunggu / Disetujui / Ditolak)
+            let filteredData = dataList.filter(x => x.approval_status === type);
+
+            // Styling Badge berdasarkan Type
+            let badgeHtml = "";
+            if (type === "Menunggu") badgeHtml = `<span class="badge badge-warning"><i class="fa-solid fa-clock"></i> Menunggu</span>`;
+            else if (type === "Disetujui") badgeHtml = `<span class="badge badge-success"><i class="fa-solid fa-check"></i> Disetujui</span>`;
+            else if (type === "Ditolak") badgeHtml = `<span class="badge badge-danger"><i class="fa-solid fa-xmark"></i> Ditolak</span>`;
+
+            document.getElementById("app").innerHTML=`
+            <div class="page-header">
+                <div>
+                    <h1>Data ${type}</h1>
+                    <p>Daftar transaksi yang berstatus ${type.toLowerCase()}</p>
+                </div>
+            </div>
+            
+            <div class="box">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tanggal</th>
+                                <th>Kode</th>
+                                <th>Keterangan Transaksi</th>
+                                <th style="text-align:right;">Jumlah (Rp)</th>
+                                <th style="text-align:center;">Status</th>
+                                ${type === "Menunggu" || type === "Ditolak" ? `<th style="text-align:center;">Aksi</th>` : ''}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filteredData.length === 0 ? `<tr><td colspan="6" style="text-align:center; padding: 20px;">Belum ada data transaksi yang ${type.toLowerCase()}</td></tr>` : ''}
+                            ${filteredData.map(x => `
+                                <tr>
+                                    <td>${formatDate(x.tanggal)}</td>
+                                    <td><span style="font-family:monospace; color:var(--muted);">${x.kode}</span></td>
+                                    <td>${x.keterangan} <br><small style="color:var(--primary); font-weight:bold;">${x.tabel}</small></td>
+                                    <td style="text-align:right; font-weight:bold;">${rupiah(x.jumlah)}</td>
+                                    <td style="text-align:center;">${badgeHtml}</td>${type === "Menunggu" ? `
+                                    <td style="text-align:center;">
+                                        <button class="btn btn-success btn-sm" onclick="prosesApproval('${x.tabel}', ${x.id}, 'Disetujui')" title="Setujui"><i class="fa-solid fa-check"></i> Setujui</button>
+                                        <button class="btn btn-danger btn-sm" onclick="promptTolak('${x.tabel}', ${x.id})" title="Tolak"><i class="fa-solid fa-xmark"></i> Tolak</button>
+                                    </td>
+                                    ` : ''}
+
+                                    ${type === "Ditolak" ? `
+                                    <td style="text-align:center;">
+                                        <button class="btn btn-light btn-sm" onclick="lihatAlasan('${x.alasan_tolak}')"><i class="fa-solid fa-comment-dots" style="color:var(--info);"></i> Lihat Alasan</button>
+                                    </td>
+                                    ` : ''}
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+        }
+
+        // BACA REQUEST DARI SIDEBAR DAN BUKA MENU YANG SESUAI
+        const target = sessionStorage.getItem("targetMenu");
+        if(target === "Disetujui") {
+            openApproval("Disetujui");
+        } else if (target === "Ditolak") {
+            openApproval("Ditolak");
+        } else {
+            openApproval("Menunggu");
+        }
+        sessionStorage.removeItem("targetMenu"); 
+    </script>
+</body>
+</html>

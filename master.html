@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Data - SIMKU SD GIM</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <!-- Library SweetAlert2 untuk Popup -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+    <!-- ================= SIDEBAR UNIVERSAL ================= -->
+    <aside class="sidebar" id="sidebar">
+        
+    </aside>
+
+    <!-- ================= MAIN ================= -->
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('show')"><i class="fa-solid fa-bars"></i></button>
+                <h3 id="topTitle">Master Data</h3>
+            </div>
+            <div class="user-box">
+                <div class="user-text">
+                    <strong id="userDisplayName">User</strong><br>
+                    <small id="userDisplayRole">Admin</small>
+                </div>
+            </div>
+        </header>
+
+        <section class="content" id="app"></section>
+    </main>
+
+    <!-- ================= MODAL & TOAST ================= -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Tambah Data</h3>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <form id="dataForm"></form>
+        </div>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <script src="db.js"></script>
+    <script src="sidebar.js"></script>
+    <script>
+        const targetMenu = sessionStorage.getItem("targetMenu") || 'Profil Sekolah';
+        renderSidebar(targetMenu);
+
+        const user = checkAuth("admin"); 
+        document.getElementById("userDisplayName").innerText = user.nama;
+
+        function closeMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar.classList.contains('show')) sidebar.classList.remove('show');
+        }
+
+        function closeModal() { document.getElementById("modal").classList.remove("show"); }
+
+        function openProfile(){
+            closeMobileSidebar();
+            document.getElementById("topTitle").innerText = "Profil Sekolah";
+            const p = db.profile;
+            document.getElementById("app").innerHTML=`
+            <div class="page-header">
+                <div><h1>Profil Sekolah</h1><p>Informasi Identitas Sekolah</p></div>
+                <button class="btn btn-primary" onclick="editProfile()"><i class="fa-solid fa-pen"></i> Edit Profil</button>
+            </div>
+            <div class="box">
+                <div class="table-wrapper">
+                    <table>
+                        <tbody>
+                            <tr><th style="width:200px">Nama Sekolah</th><td>${p.nama}</td></tr>
+                            <tr><th>NPSN</th><td>${p.npsn}</td></tr>
+                            <tr><th>NSS</th><td>${p.nss}</td></tr>
+                            <tr><th>Alamat</th><td>${p.alamat}</td></tr>
+                            <tr><th>Kepala Sekolah</th><td>${p.kepala}</td></tr>
+                            <tr><th>Bendahara Sekolah</th><td>${p.bendahara}</td></tr>
+                            <tr><th>Telepon</th><td>${p.telepon}</td></tr>
+                            <tr><th>Email</th><td>${p.email}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+        }
+
+        function editProfile(){
+            document.getElementById("modal").classList.add("show");
+            document.getElementById("modalTitle").innerText = "Edit Profil Sekolah";
+            const p = db.profile;
+            document.getElementById("dataForm").innerHTML=`
+            <div class="form-grid">
+                ${Object.keys(p).map(k=>`
+                    <div class="form-group ${k==="alamat"?"full":""}">
+                        <label style="text-transform: capitalize">${k}</label>${k==="alamat" ? `<textarea name="${k}">${p[k]}</textarea>` : `<input name="${k}" value="${p[k]}" required>`}
+                    </div>
+                `).join("")}
+            </div>
+            <br>
+            <button class="btn btn-success" type="button" onclick="saveProfile()"><i class="fa-solid fa-save"></i> Simpan</button>
+            <button class="btn btn-light" type="button" onclick="closeModal()">Batal</button>
+            `;
+        }
+
+        function saveProfile(){
+            const fd = new FormData(document.getElementById("dataForm"));
+            fd.forEach((v,k) => db.profile[k] = v);
+            saveDB(); closeModal(); openProfile(); toast("Profil sekolah berhasil diperbarui");
+        }
+
+        function openTable(name){
+            closeMobileSidebar();
+            document.getElementById("topTitle").innerText = name;
+            const data = db[name] || [];
+            
+            let columns = data.length > 0 
+                ? Object.keys(data[0]).filter(x => x !== "id" && x !== "password" && !(name === "Pengguna" && x === "status")) 
+                : getDefaultFields(name).filter(x => x !== "password");
+
+            document.getElementById("app").innerHTML=`
+            <div class="page-header">
+                <div><h1>Master ${name}</h1><p>Kelola data ${name.toLowerCase()}</p></div>
+                <button class="btn btn-primary" onclick="openForm('${name}')"><i class="fa-solid fa-plus"></i> Tambah Data</button>
+            </div>
+            <div class="box">
+                <div class="toolbar"><input class="search" placeholder="Cari data" onkeyup="searchTable(this.value,'${name}')"></div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr>${columns.map(c=>`<th style="text-transform:capitalize">${c}</th>`).join("")}<th>Aksi</th></tr></thead>
+                        <tbody id="tableBody">${renderRows(name, data, columns)}</tbody>
+                    </table>
+                </div>
+            </div>`;
+        }
+
+        function renderRows(name, data, columns){
+            if(data.length === 0) return `<tr><td colspan="${columns.length+1}" style="text-align:center">Data Kosong</td></tr>`;
+            return data.map(row => `
+                <tr>
+                    ${columns.map(c => { let value = row[c]; if(c === "status") value = badge(value); return `<td>${value ?? "-"}</td>`; }).join("")}
+                    <td>
+                        <button class="btn btn-light btn-sm" onclick="openForm('${name}',${row.id})" title="Edit Data"><i class="fa-solid fa-pen" style="color: #1d5d9b;"></i></button>
+                        <button class="btn btn-light btn-sm" onclick="deleteData('${name}',${row.id})" title="Hapus Data" style="background-color: #fff5f5; border: 1px solid #ffcccc;"><i class="fa-solid fa-trash" style="color: #dc3545;"></i></button>
+                    </td>
+                </tr>
+            `).join("");
+        }
+
+        function searchTable(keyword, name){
+            const data = db[name] || [];
+            const filtered = data.filter(row => Object.values(row).join(" ").toLowerCase().includes(keyword.toLowerCase()));
+            let columns = data.length > 0 ? Object.keys(data[0]).filter(x => x !== "id" && x !== "password" && !(name === "Pengguna" && x === "status")) : getDefaultFields(name).filter(x => x !== "password");
+            document.getElementById("tableBody").innerHTML = renderRows(name, filtered, columns);
+        }
+
+        function openForm(name, id=null){
+            let item = id ? db[name].find(x => x.id === id) : null;
+            document.getElementById("modal").classList.add("show");
+            document.getElementById("modalTitle").innerText = id ? `Edit ${name}` : `Tambah ${name}`;
+            
+            let fields = item ? Object.keys(item).filter(x => x !== "id" && !(name === "Pengguna" && x === "status")) : getDefaultFields(name);
+
+            document.getElementById("dataForm").innerHTML=`
+                <div class="form-grid">
+                ${fields.map(field=>{
+                    let value = item?.[field]??""; let inputHtml = ""; let isFull = false;
+
+                    if(field === "keterangan" || field === "alamat") { isFull = true; inputHtml = `<textarea name="${field}" required>${value}</textarea>`; } 
+                    else if (field === "status") { inputHtml = `<select name="${field}" required><option value="Aktif" ${value === "Aktif" ? "selected" : ""}>Aktif</option><option value="Tidak Aktif" ${value === "Tidak Aktif" ? "selected" : ""}>Tidak Aktif</option></select>`; } 
+                    else if (name === "Pengguna" && field === "role") { 
+                        let hakAksesData = db["Hak Akses"] || []; 
+                        let options = hakAksesData.map(h => `<option value="${h.nama}" ${value === h.nama ? "selected" : ""}>${h.nama}</option>`).join("");
+                        inputHtml = `<select name="${field}" required>${options || '<option value="">-- Buat Hak Akses Terlebih Dahulu --</option>'}</select>`; 
+                    } 
+                    else { inputHtml = `<input type="${field === "password" ? "text" : "text"}" name="${field}" value="${value}" required>`; }
+
+                    return `<div class="form-group ${isFull ? "full" : ""}"><label style="text-transform:capitalize">${field}</label>${inputHtml}</div>`;
+                }).join("")}
+                </div><br>
+                <button type="button" class="btn btn-success" onclick="saveForm('${name}', ${id || "null"})"><i class="fa-solid fa-save"></i> Simpan</button>
+                <button type="button" class="btn btn-light" onclick="closeModal()">Batal</button>
+            `;
+        }
+
+        function getDefaultFields(name){
+            const map={"Tahun Anggaran":["tahun","status"], "Pengguna":["nama","username","password","role"], "Hak Akses":["nama","keterangan"]};
+            return map[name] || ["nama","keterangan"];
+        }
+
+        function saveForm(name, id){
+            const form = document.getElementById("dataForm");
+            if(!form.checkValidity()) { toast("Mohon isi semua data"); return; }
+
+            const fd = new FormData(form); let obj = {}; fd.forEach((value,key) => obj[key] = value);
+
+            if(id){ const index = db[name].findIndex(x => x.id === id); obj.id = id; db[name][index] = obj; toast("Data berhasil diperbarui"); }
+            else{ obj.id = Date.now(); if(!db[name]) db[name] = []; db[name].push(obj); toast("Data berhasil ditambahkan"); }
+            
+            saveDB(); closeModal(); openTable(name);
+        }
+
+        function deleteData(name, id){
+            Swal.fire({
+                title: 'Hapus Data',
+                text: "Data yang dihapus tidak dapat dikembalikan",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="fa-solid fa-trash"></i> Ya',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    db[name] = db[name].filter(x => x.id !== id);
+                    saveDB(); 
+                    openTable(name); 
+                    Swal.fire({ title: 'Terhapus', text: 'Data berhasil dihapus', icon: 'success', timer: 1500, showConfirmButton: false });
+                }
+            });
+        }
+
+        // Jalankan profil saat pertama load
+        // BACA REQUEST DARI SIDEBAR DAN BUKA MENU YANG SESUAI
+        const target = sessionStorage.getItem("targetMenu");
+        if(target === "Tahun Anggaran" || target === "Pengguna" || target === "Hak Akses") {
+            openTable(target);
+            document.getElementById('masterMenu').classList.add('open');
+        } else {
+            openProfile();
+            document.getElementById('masterMenu').classList.add('open');
+        }
+        sessionStorage.removeItem("targetMenu"); // Bersihkan memori
+    </script>
+</body>
+</html>

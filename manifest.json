@@ -1,0 +1,16 @@
+{
+  "name": "SIM Keuangan Sekolah",
+  "short_name": "SIMKU SD",
+  "description": "Sistem Informasi Keuangan Sekolah",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#12355b",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1046/1046424.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

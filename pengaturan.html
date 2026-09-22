@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pengaturan - SIMKU SD GIM</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <!-- Library SweetAlert2 untuk Popup -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        .log-table th, .log-table td { text-align: left; }
+
+        /* Layout Grid Presisi Sejajar (Stretch Height) */
+        .pengaturan-grid { display: grid; grid-template-columns: 280px 1fr; gap: 24px; align-items: stretch; }
+        
+        /* Action Card dengan Flex: 1 agar tingginya otomatis membagi rata ruang yang ada */
+        .action-card { background: white; border-radius: 12px; padding: 25px 20px; box-shadow: 0 4px 15px rgba(0,0,0,.03); border: 1px solid var(--border); text-align: center; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; justify-content: center; align-items: center; flex: 1; }
+        .action-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,.06); }
+        .action-card i { font-size: 32px; margin-bottom: 12px; }
+        .action-card h4 { font-size: 15px; margin-bottom: 5px; color: var(--text); }
+        .action-card p { font-size: 12px; color: var(--muted); margin: 0; line-height: 1.4; text-align: center; }
+
+        /* Styling Drag and Drop Upload Box */
+        .dropzone { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 25px; text-align: center; background: #f8fafc; cursor: pointer; position: relative; transition: all 0.2s; }
+        .dropzone:hover { border-color: var(--primary); background: #f1f5f9; }
+        .dropzone i { font-size: 32px; color: var(--primary); margin-bottom: 12px; }
+        .dropzone p { font-size: 13px; color: var(--muted); margin: 0; }
+        .dropzone input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+
+        /* Preview Gambar dengan Tombol X */
+        .preview-container { position: relative; display: inline-block; margin-top: 10px; width: 100%; }
+        .preview-img { max-width: 100%; max-height: 120px; border-radius: 8px; border: 1px solid var(--border); padding: 4px; background: white; display: block; object-fit: contain; }
+        .btn-remove-img { position: absolute; top: -8px; right: -8px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: background 0.2s; }
+        .btn-remove-img:hover { background: #b02a37; }
+
+        /* Styling Halaman Lisensi */
+        .license-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+        .license-card { background: white; border-radius: 14px; padding: 22px; box-shadow: 0 4px 20px rgba(0,0,0,.04); border-top: 5px solid; position: relative; }
+        .lc-blue { border-color: #3b82f6; background: #f8fafc; }
+        .lc-green { border-color: #22c55e; background: #f0fdf4; }
+        .lc-purple { border-color: #a855f7; background: #faf5ff; }
+        .lc-red { border-color: #ef4444; background: #fef2f2; }
+        
+        .license-card h3 { font-size: 16px; display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+        .license-card p, .license-card li { font-size: 13px; color: var(--muted); line-height: 1.6; }
+        .license-card ul { padding-left: 18px; margin-top: 8px; }
+        .badge-update { background: #e0e7ff; color: #3730a3; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; display: inline-block; margin-bottom: 8px; }
+        .contact-btn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px; border-radius: 8px; color: white; font-weight: bold; text-decoration: none; margin-top: 12px; font-size: 13px; }
+        .btn-wa { background: #22c55e; }
+        .btn-mail { background: #1e293b; }
+    </style>
+</head>
+<body>
+    <!-- ================= SIDEBAR UNIVERSAL ================= -->
+    <aside class="sidebar" id="sidebar">
+        
+    </aside>
+
+    <!-- ================= MAIN ================= -->
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('show')"><i class="fa-solid fa-bars"></i></button>
+                <h3 id="topTitle">Pengaturan</h3>
+            </div>
+            <div class="user-box">
+                <div class="user-text">
+                    <strong id="userDisplayName">User</strong><br>
+                    <small id="userDisplayRole">Admin</small>
+                </div>
+            </div>
+        </header>
+
+        <section class="content" id="app"></section>
+    </main>
+
+    <div class="toast" id="toast"></div>
+
+    <input type="file" id="hiddenRestoreInput" accept=".json" style="display:none;" onchange="handleFileRestore(this)">
+
+    <script src="db.js"></script>
+    <script src="sidebar.js"></script>
+    <script>
+        const targetMenu = sessionStorage.getItem("targetMenu") || 'Legger';
+        renderSidebar(targetMenu);
+
+        const user = checkAuth("admin"); 
+        document.getElementById("userDisplayName").innerText = user.nama;
+
+        function closeMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar.classList.contains('show')) sidebar.classList.remove('show');
+        }
+
+        function logActivity(activityText) {
+            if(!db["Log Aktivitas"]) db["Log Aktivitas"] = [];
+            db["Log Aktivitas"].unshift({
+                id: Date.now(), waktu: new Date().toISOString(),
+                pengguna: user.nama || "Admin", aktivitas: activityText
+            });
+            saveDB();
+        }
+
+        function formatWaktu(isoString) {
+            if(!isoString) return "-";
+            let d = new Date(isoString);
+            return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+        }
+
+        function openSetting(type) {
+            closeMobileSidebar();
+            document.getElementById("topTitle").innerText = "Pengaturan - " + type;
+
+            if (type === "Legger") renderLegger();
+            else if (type === "Lisensi") renderLisensi();
+            else if (type === "Log Aktivitas") renderLog();
+        }
+
+        // ================= RENDER LEGGER + 3 KOTAK DI KIRI (HEIGHT: 100%) =================
+        function renderLegger() {
+            let leg = db.legger || {};
+            
+            document.getElementById("app").innerHTML=`
+            <div class="page-header" style="margin-bottom: 20px;">
+                <div><h1>Pengaturan Legger & Database</h1></div>
+            </div>
+            
+            <div class="pengaturan-grid">
+                <!-- Kolom Kiri: 3 Kotak Fleksibel yang merata secara vertikal -->
+                <div style="display: flex; flex-direction: column; gap: 24px; height: 100%;">
+                    <div class="action-card" onclick="processBackup()" style="border-left: 5px solid #3b82f6;">
+                        <i class="fa-solid fa-cloud-arrow-down" style="color: #3b82f6;"></i>
+                        <h4>Backup Data</h4>
+                        <p>Unduh file cadangan database sistem (.json)</p>
+                    </div>
+
+                    <div class="action-card" onclick="processRestore()" style="border-left: 5px solid #f39c12;">
+                        <i class="fa-solid fa-cloud-arrow-up" style="color: #f39c12;"></i>
+                        <h4>Restore Data</h4>
+                        <p>Pulihkan database dari file cadangan JSON</p>
+                    </div>
+
+                    <div class="action-card" onclick="processReset()" style="border-left: 5px solid #dc3545;">
+                        <i class="fa-solid fa-triangle-exclamation" style="color: #dc3545;"></i>
+                        <h4>Reset Data</h4>
+                        <p>Kosongkan seluruh data transaksi & database</p>
+                    </div>
+                </div>
+
+                <!-- Kolom Kanan: Form Legger -->
+                <div class="box" style="margin: 0; text-align: left !important; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <h3 style="margin-bottom: 20px; color: var(--primary);"><i class="fa-solid fa-file-pen"></i> Pengaturan Legger</h3>
+                        
+                        <!-- Kop Sekolah -->
+                        <div class="form-group" style="margin-bottom:20px; text-align: left;">
+                            <label style="display:block; text-align:left; margin-bottom:8px; font-weight:bold;">Upload Kop Sekolah</label>
+                            <div class="dropzone" id="dropzoneKop" style="display: ${leg.kop ? 'none' : 'block'};">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <p>Seret & letakkan gambar di sini, atau <strong>Pilih File</strong></p>
+                                <input type="file" id="fileKop" accept="image/*" onchange="handleFileSelect(this, 'kop')">
+                            </div>
+                            <div class="preview-container" id="containerKop" style="display: ${leg.kop ? 'block' : 'none'};">
+                                <img id="prevKop" class="preview-img" src="${leg.kop || ''}">
+                                <button type="button" class="btn-remove-img" onclick="removeImage('kop')"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                        </div>
+                        
+                        <!-- TTD Kepala Sekolah -->
+                        <div class="form-group" style="margin-bottom:20px; text-align: left;">
+                            <label style="display:block; text-align:left; margin-bottom:8px; font-weight:bold;">Tanda Tangan Kepala Sekolah</label>
+                            <div class="dropzone" id="dropzoneKepsek" style="display: ${leg.ttdKepsek ? 'none' : 'block'};">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <p>Seret & letakkan gambar di sini, atau <strong>Pilih File</strong></p>
+                                <input type="file" id="fileKepsek" accept="image/*" onchange="handleFileSelect(this, 'ttdKepsek')">
+                            </div>
+                            <div class="preview-container" id="containerKepsek" style="display: ${leg.ttdKepsek ? 'block' : 'none'}; max-width: 250px;">
+                                <img id="prevKepsek" class="preview-img" src="${leg.ttdKepsek || ''}">
+                                <button type="button" class="btn-remove-img" onclick="removeImage('ttdKepsek')"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- TTD Bendahara -->
+                        <div class="form-group" style="margin-bottom:30px; text-align: left;">
+                            <label style="display:block; text-align:left; margin-bottom:8px; font-weight:bold;">Tanda Tangan Bendahara</label>
+                            <div class="dropzone" id="dropzoneBendahara" style="display: ${leg.ttdBendahara ? 'none' : 'block'};">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <p>Seret & letakkan gambar di sini, atau <strong>Pilih File</strong></p>
+                                <input type="file" id="fileBendahara" accept="image/*" onchange="handleFileSelect(this, 'ttdBendahara')">
+                            </div>
+                            <div class="preview-container" id="containerBendahara" style="display: ${leg.ttdBendahara ? 'block' : 'none'}; max-width: 250px;">
+                                <img id="prevBendahara" class="preview-img" src="${leg.ttdBendahara || ''}">
+                                <button type="button" class="btn-remove-img" onclick="removeImage('ttdBendahara')"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" style="width:100%; padding: 12px; font-size: 15px;" onclick="saveLegger()"><i class="fa-solid fa-save"></i> Simpan</button>
+                </div>
+            </div>`;
+        }
+
+        function handleFileSelect(input, key) {
+            if (input.files && input.files[0]) {
+                let reader = new FileReader();
+                reader.onload = function(e) {
+                    if(!db.legger) db.legger = {};
+                    db.legger[key] = e.target.result;
+
+                    let mapKey = key === 'kop' ? 'Kop' : (key === 'ttdKepsek' ? 'Kepsek' : 'Bendahara');
+                    document.getElementById('dropzone' + mapKey).style.display = 'none';
+                    let cont = document.getElementById('container' + mapKey);
+                    cont.style.display = 'block';
+                    document.getElementById('prev' + mapKey).src = e.target.result;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function removeImage(key) {
+            if(!db.legger) db.legger = {};
+            db.legger[key] = "";
+
+            let mapKey = key === 'kop' ? 'Kop' : (key === 'ttdKepsek' ? 'Kepsek' : 'Bendahara');
+            document.getElementById('container' + mapKey).style.display = 'none';
+            document.getElementById('dropzone' + mapKey).style.display = 'block';
+            
+            let fileInput = document.getElementById('file' + mapKey);
+            if(fileInput) fileInput.value = "";
+        }
+
+        function saveLegger() {
+            saveDB();
+            logActivity("Memperbarui file Legger (Kop / Tanda Tangan)");
+            Swal.fire('Tersimpan!', 'File Legger berhasil diperbarui dan disimpan.', 'success');
+        }
+
+        // ================= BACKUP, RESTORE & RESET =================
+        function processBackup() {
+            const dataStr = JSON.stringify(db, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "Backup_SIMKU_" + new Date().toISOString().split("T")[0] + ".json";
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            logActivity("Melakukan Backup Data Sistem ke format JSON");
+            Swal.fire({
+                title: 'Backup Berhasil',
+                text: 'File database JSON berhasil diunduh',
+                icon: 'success',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+
+        function processRestore() {
+            document.getElementById("hiddenRestoreInput").click();
+        }
+
+        function handleFileRestore(input) {
+            if (!input.files.length) return;
+
+            Swal.fire({
+                title: 'Pulihkan Sistem?',
+                text: "Semua data saat ini akan ditimpa dengan file backup yang dipilih",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#f39c12',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const restoredData = JSON.parse(e.target.result);
+                            if (typeof restoredData === 'object' && restoredData !== null) {
+                                db = restoredData;
+                                saveDB();
+                                logActivity("Melakukan Restore Data Sistem dari file JSON");
+                                Swal.fire('Berhasil!', 'Data sistem telah berhasil dipulihkan', 'success')
+                                .then(() => { location.reload(); });
+                            } else {
+                                throw new Error();
+                            }
+                        } catch (err) {
+                            Swal.fire('Error', 'File yang diunggah tidak valid', 'error');
+                        }
+                    };
+                    reader.readAsText(input.files[0]);
+                }
+                input.value = ""; 
+            });
+        }
+
+        function processReset() {
+            Swal.fire({
+                title: 'RESET DATA SISTEM?',
+                text: "Peringatan! Tindakan ini akan mengosongkan seluruh transaksi, anggaran, dan data aplikasi secara permanen",
+                icon: 'error',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    localStorage.clear(); 
+                    db = {}; 
+                    saveDB();
+                    logActivity("Melakukan Reset Total Data Sistem");
+                    Swal.fire('Ter-reset!', 'Seluruh data aplikasi telah dikosongkan', 'success')
+                    .then(() => { location.reload(); });
+                }
+            });
+        }
+
+        // ================= RENDER LISENSI =================
+        function renderLisensi() {
+            document.getElementById("app").innerHTML=`
+            <div class="page-header" style="margin-bottom: 20px;">
+                <div>
+                    <h1>Informasi Sistem & Lisensi</h1>
+                    <p>Detail kepemilikan dan pusat bantuan sistem</p>
+                </div>
+            </div>
+            
+            <!-- Menggunakan auto-fit dan stretch agar 2 kotak membagi layar sama rata dan tingginya sejajar -->
+            <div class="license-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; align-items: stretch;">
+                
+                <!-- Kotak 1: Identitas & Kepemilikan -->
+                <div class="license-card lc-blue" style="height: 100%; display: flex; flex-direction: column;">
+                    <h3><i class="fa-solid fa-certificate" style="color:#3b82f6;"></i> Identitas & Kepemilikan</h3>
+                    <hr style="border:0; border-top:1px solid #cbd5e1; margin-bottom:16px;">
+                    <div style="flex: 1;">
+                        <p><strong>NAMA RESMI & VERSI</strong><br>SIMKU SD GIM Versi 1.0</p><br>
+                        <p><strong>KEPEMILIKAN EKSKLUSIF</strong><br>Sistem ini dilisensikan dan diperuntukkan secara khusus hanya untuk penggunaan internal sekolah Anda</p><br>
+                        <p><strong>HAK CIPTA</strong><br>&copy; 2026 Hak Cipta Dilindungi.</p>
+                    </div>
+                </div>
+
+                <!-- Kotak 2: Pusat Bantuan -->
+                <div class="license-card lc-green" style="height: 100%; display: flex; flex-direction: column;">
+                    <h3><i class="fa-solid fa-headset" style="color:#22c55e;"></i> Pusat Bantuan</h3>
+                    <hr style="border:0; border-top:1px solid #bbf7d0; margin-bottom:16px;">
+                    <div style="flex: 1;">
+                        <p>Jika Anda mengalami kendala teknis atau membutuhkan dukungan terkait sistem, silakan hubungi kontak di bawah ini:</p>
+                    </div>
+                    <div style="margin-top: auto;">
+                        <a href="https://wa.me/628773602595" target="_blank" class="contact-btn btn-wa"><i class="fa-brands fa-whatsapp" style="font-size:16px;"></i> 08773602595</a>
+                        <a href="mailto:officialprojectnew@gmail.com" class="contact-btn btn-mail"><i class="fa-solid fa-envelope"></i> officialprojectnew@gmail.com</a>
+                    </div>
+                </div>
+
+            </div>`;
+        }
+
+        // ================= RENDER LOG AKTIVITAS =================
+        function renderLog() {
+            let logs = db["Log Aktivitas"] || [];
+            document.getElementById("app").innerHTML=`
+            <div class="page-header">
+                <div><h1>Log Aktivitas</h1><p>Riwayat jejak aktivitas pengguna di dalam sistem.</p></div>
+            </div>
+            <div class="box">
+                <div class="table-wrapper">
+                    <table class="log-table">
+                        <thead>
+                            <tr>
+                                <th style="width:180px;">Waktu</th>
+                                <th style="width:150px;">Pengguna</th>
+                                <th>Aktivitas</th>
+                                <th style="width:180px; text-align:center;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${logs.length === 0 ? `<tr><td colspan="4" style="text-align:center;">Belum ada log aktivitas.</td></tr>` : ''}
+                            ${logs.map(x => `
+                                <tr>
+                                    <td><i class="fa-regular fa-clock" style="color:var(--muted); margin-right:5px;"></i> ${formatWaktu(x.waktu)}</td>
+                                    <td style="font-weight:bold; color:var(--primary);">${x.pengguna}</td>
+                                    <td>${x.aktivitas}</td>
+                                    <td style="text-align:center;">
+                                        <button class="btn btn-light btn-sm" onclick="detailLog(${x.id})">Detail</button>
+                                        <button class="btn btn-light btn-sm" style="background:#fff5f5; border:1px solid #ffcccc; color:#dc3545;" onclick="hapusLog(${x.id})">Hapus</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+        }
+
+        function detailLog(id) {
+            let log = (db["Log Aktivitas"] || []).find(x => x.id === id);
+            if(!log) return;
+            Swal.fire({
+                title: 'Detail Aktivitas',
+                html: `<div style="text-align:left; font-size:14px; line-height: 1.8;">
+                        <strong>Waktu:</strong> ${formatWaktu(log.waktu)}<br>
+                        <strong>Pengguna:</strong> <span style="color:var(--primary);">${log.pengguna}</span><br>
+                        <strong>Detail Aksi:</strong> ${log.aktivitas}
+                       </div>`,
+                icon: 'info', confirmButtonText: 'Tutup'
+            });
+        }
+
+        function hapusLog(id) {
+            Swal.fire({
+                title: 'Hapus Log', text: "Riwayat log ini akan dihapus permanen", icon: 'warning',
+                showCancelButton: true, confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Hapus', cancelButtonText: 'Batal', reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    db["Log Aktivitas"] = db["Log Aktivitas"].filter(x => x.id !== id);
+                    saveDB(); renderLog(); toast("Log berhasil dihapus");
+                }
+            });
+        }
+
+        // ROUTER INITIATOR
+        const target = sessionStorage.getItem("targetMenu");
+        if(target === "Lisensi") openSetting("Lisensi");
+        else if (target === "Log Aktivitas") openSetting("Log Aktivitas");
+        else openSetting("Legger");
+        sessionStorage.removeItem("targetMenu"); 
+    </script>
+</body>
+</html>

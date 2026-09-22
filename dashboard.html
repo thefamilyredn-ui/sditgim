@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beranda - SIMKU SD GIM</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- ================= SIDEBAR UNIVERSAL ================= -->
+    <aside class="sidebar" id="sidebar">
+
+    </aside>
+
+    <!-- MAIN KONTEN -->
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('show')"><i class="fa-solid fa-bars"></i></button>
+                <h3 id="topTitle">Dashboard</h3>
+            </div>
+            <div class="user-box">
+                <div class="user-text">
+                    <strong id="userDisplayName">User</strong><br>
+                    <small id="userDisplayRole">Role</small>
+                </div>
+            </div>
+        </header>
+
+        <section class="content" id="app"></section>
+    </main>
+
+    <script src="db.js"></script>
+    <script src="sidebar.js"></script>
+    <script>
+        renderSidebar('dashboard');
+        
+        const user = checkAuth();
+        document.getElementById("userDisplayName").innerText = user.nama;
+        document.getElementById("userDisplayRole").innerText = user.role.toUpperCase();
+
+        if (user.role === "guru") {
+            document.getElementById("adminMenu").style.display = "none";
+            renderGuruDashboard();
+        } else {
+            renderAdminDashboard();
+        }
+
+        function renderAdminDashboard() {
+            const income = total(db["Pendapatan"]);
+            const expense = total(db["Pengeluaran"]);
+            const balance = income - expense;
+            const waiting = [...db["Pendapatan"], ...db["Pengeluaran"]].filter(x => x.status === "Menunggu").length;
+
+            const recentTransactions = [
+                ...db["Pendapatan"].map(x => ({...x, jenis: "Pendapatan"})),
+                ...db["Pengeluaran"].map(x => ({...x, jenis: "Pengeluaran"}))
+            ].sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal)).slice(0, 5);
+
+            document.getElementById("app").innerHTML = `
+                <div class="page-header">
+                    <div><h1>Dashboard Keuangan Sekolah</h1><p>Ringkasan Informasi Keuangan Sekolah</p></div>
+                </div>
+
+                <div class="cards">
+                    <div class="card"><div class="card-icon green"><i class="fa-solid fa-arrow-trend-up"></i></div><div class="card-title">Total Pendapatan</div><div class="card-value">${rupiah(income)}</div></div>
+                    <div class="card"><div class="card-icon red"><i class="fa-solid fa-arrow-trend-down"></i></div><div class="card-title">Total Pengeluaran</div><div class="card-value">${rupiah(expense)}</div></div>
+                    <div class="card"><div class="card-icon blue"><i class="fa-solid fa-wallet"></i></div><div class="card-title">Saldo</div><div class="card-value">${rupiah(balance)}</div></div>
+                    <div class="card" onclick="goToApproval()" style="cursor: pointer; transition: transform 0.2s;">
+                        <div class="card-icon" style="background: #fff3cd; color: #856404;"><i class="fa-solid fa-clock"></i></div>
+                        <div class="card-title">Menunggu Approval</div>
+                        <div class="card-value" id="valPendingApproval">0</div>
+                    </div>
+                </div>
+
+                <div class="box">
+                    <div class="box-title"><h3>Grafik Pendapatan & Pengeluaran</h3></div>
+                    <canvas id="monthlyChart" style="max-height: 300px;"></canvas>
+                </div>
+
+                <div class="box">
+                    <div class="box-title"><h3>Transaksi Terbaru</h3></div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Tanggal</th><th>Jenis</th><th>Keterangan</th><th>Jumlah</th><th>Status</th></tr></thead>
+                            <tbody>
+                                ${recentTransactions.map(x => `<tr><td>${formatDate(x.tanggal)}</td><td>${x.jenis}</td><td>${x.keterangan}</td><td>${rupiah(x.jumlah)}</td><td>${badge(x.status)}</td></tr>`).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            setTimeout(renderMonthlyChart, 100);
+        }
+
+        function renderGuruDashboard() {
+            document.getElementById("app").innerHTML = `
+                <div class="page-header"><div><h1>Selamat Datang, ${user.nama}</h1></div></div>
+                <div class="box"><p>Portal khusus tenaga pendidik</p></div>
+            `;
+        }
+
+        function renderMonthlyChart() {
+            const ctx = document.getElementById("monthlyChart");
+            if(!ctx) return;
+            let inc = Array(12).fill(0), exp = Array(12).fill(0);
+            db["Pendapatan"].forEach(i => { inc[new Date(i.tanggal).getMonth()] += Number(i.jumlah); });
+            db["Pengeluaran"].forEach(i => { exp[new Date(i.tanggal).getMonth()] += Number(i.jumlah); });
+
+            new Chart(ctx, {
+                type: "bar", data: {
+                    labels: ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"],
+                    datasets: [{ label: "Pendapatan", backgroundColor: "#198754", data: inc }, { label: "Pengeluaran", backgroundColor: "#dc3545", data: exp }]
+                }, options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+                // Panggil fungsi ini di bagian bawah script agar langsung dieksekusi saat halaman dimuat
+        hitungPendingApproval();
+
+        function hitungPendingApproval() {
+            // Ambil data dari database
+            let dataPendapatan = db["Pendapatan"] || [];
+            let dataPengeluaran = db["Rencana Pengeluaran"] || [];
+
+            // Filter transaksi yang status approval-nya "Menunggu" atau kosong (default)
+            let pendingPendapatan = dataPendapatan.filter(x => !x.approval_status || x.approval_status === "Menunggu").length;
+            let pendingPengeluaran = dataPengeluaran.filter(x => !x.approval_status || x.approval_status === "Menunggu").length;
+
+            // Totalkan dan tampilkan ke kartu Dashboard
+            let totalPending = pendingPendapatan + pendingPengeluaran;
+            
+            let elPending = document.getElementById("valPendingApproval");
+            if(elPending) {
+                elPending.innerText = totalPending;
+                
+                // Beri efek warna merah jika ada tumpukan persetujuan
+                if(totalPending > 0) {
+                    elPending.style.color = "#dc3545"; 
+                }
+            }
+        }
+
+        // Fungsi untuk melompat langsung ke halaman Approval sub-menu Menunggu
+        function goToApproval() {
+            sessionStorage.setItem("targetMenu", "Menunggu");
+            window.location.href = "approval.html";
+        }
+    </script>
+</body>
+</html>

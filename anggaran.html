@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anggaran - SIMKU SD GIM</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <!-- Library SweetAlert2 untuk Popup -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+    <!-- ================= SIDEBAR UNIVERSAL ================= -->
+    <aside class="sidebar" id="sidebar">
+        
+    </aside>
+
+    <!-- ================= MAIN ================= -->
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('show')"><i class="fa-solid fa-bars"></i></button>
+                <h3 id="topTitle">Anggaran</h3>
+            </div>
+            <div class="user-box">
+                <div class="user-text">
+                    <strong id="userDisplayName">User</strong><br>
+                    <small id="userDisplayRole">Admin</small>
+                </div>
+            </div>
+        </header>
+
+        <section class="content" id="app"></section>
+    </main>
+
+    <!-- ================= MODAL & TOAST ================= -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Tambah Data</h3>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <form id="dataForm"></form>
+        </div>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <script src="db.js"></script>
+    <script src="sidebar.js"></script>
+    <script>
+        const targetMenu = sessionStorage.getItem("targetMenu") || 'Rencana Anggaran';
+        renderSidebar(targetMenu);
+
+        const user = checkAuth("admin"); 
+        document.getElementById("userDisplayName").innerText = user.nama;
+
+        function closeMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar.classList.contains('show')) sidebar.classList.remove('show');
+        }
+
+        function closeModal() { document.getElementById("modal").classList.remove("show"); }
+
+        /* =====================================================
+           TAMPILAN TABEL CRUD
+        ===================================================== */
+        function openTable(name){
+            closeMobileSidebar();
+            document.getElementById("topTitle").innerText = name;
+            const data = db[name] || [];
+            
+            let columns = getDefaultFields(name);
+
+            // Hitung Total Ringkasan
+            let summaryHtml = "";
+            if(name === "Rencana Anggaran") {
+                let totalAnggaran = total(data, "total");
+                summaryHtml = `
+                <div style="text-align: right; display: flex; align-items: center;">
+                    <span style="color: var(--muted); margin-right: 5px;">Total Plafon Anggaran:</span> 
+                    <strong style="color: var(--primary); font-size: 16px;">${rupiah(totalAnggaran)}</strong>
+                </div>`;
+            } else if (name === "Rencana Pengeluaran") {
+                let totalPengeluaran = total(data, "total");
+                summaryHtml = `
+                <div style="text-align: right; display: flex; align-items: center;">
+                    <span style="color: var(--muted); margin-right: 5px;">Total Realisasi Pengeluaran:</span> 
+                    <strong style="color: var(--danger); font-size: 16px;">${rupiah(totalPengeluaran)}</strong>
+                </div>`;
+            }
+
+            document.getElementById("app").innerHTML=`
+            <div class="page-header">
+                <div><h1>Data ${name}</h1><p>Kelola data ${name.toLowerCase()} sekolah</p></div>
+                <button class="btn btn-primary" onclick="openForm('${name}')"><i class="fa-solid fa-plus"></i> Tambah Data</button>
+            </div>
+            
+            <div class="box">
+                <div class="toolbar" style="align-items: center;">
+                    <input class="search" placeholder="Cari data" onkeyup="searchTable(this.value,'${name}')">
+                    ${summaryHtml}
+                </div>
+                
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                ${columns.map(c=>`<th style="text-transform:capitalize">${c.replace("_", " ")}</th>`).join("")}
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">${renderRows(name, data, columns)}</tbody>
+                    </table>
+                </div>
+            </div>`;
+        }
+
+        function renderRows(name, data, columns){
+            if(data.length === 0) return `<tr><td colspan="${columns.length+1}" style="text-align:center">Belum ada data ${name.toLowerCase()}</td></tr>`;
+            
+            return data.map(row => `
+                <tr>
+                    ${columns.map(c => {
+                        let value = row[c];
+                        if (c === "nilai" || c === "total") value = rupiah(value);
+                        else if (c === "tanggal") value = formatDate(value);
+                        else if (c === "status") value = `<span class="badge ${value === 'Tunai' ? 'badge-success' : 'badge-warning'}">${value}</span>`;
+                        return `<td>${value ?? "-"}</td>`;
+                    }).join("")}
+                    <td>
+                        <button class="btn btn-light btn-sm" onclick="openForm('${name}',${row.id})" title="Edit Data"><i class="fa-solid fa-pen" style="color: #1d5d9b;"></i></button>
+                        <button class="btn btn-light btn-sm" onclick="deleteData('${name}',${row.id})" title="Hapus Data" style="background-color: #fff5f5; border: 1px solid #ffcccc;"><i class="fa-solid fa-trash" style="color: #dc3545;"></i></button>
+                    </td>
+                </tr>
+            `).join("");
+        }
+
+        function searchTable(keyword, name){
+            const data = db[name] || [];
+            const filtered = data.filter(row => Object.values(row).join(" ").toLowerCase().includes(keyword.toLowerCase()));
+            const columns = getDefaultFields(name);
+            document.getElementById("tableBody").innerHTML = renderRows(name, filtered, columns);
+        }
+
+        /* =====================================================
+           TAMPILAN REALISASI ANGGARAN
+        ===================================================== */
+        function openBudget(){
+            closeMobileSidebar();
+            document.getElementById("topTitle").innerText = "Realisasi Anggaran";
+
+            const rencana = db["Rencana Anggaran"] || [];
+            const realisasi = db["Rencana Pengeluaran"] || [];
+
+            const totalRencana = total(rencana, "total");
+            const totalRealisasi = total(realisasi, "total");
+            const sisa = totalRencana - totalRealisasi;
+            const persentase = totalRencana ? Math.round((totalRealisasi / totalRencana) * 100) : 0;
+
+            document.getElementById("app").innerHTML=`
+            <div class="page-header">
+                <div>
+                    <h1>Anggaran vs Realisasi</h1>
+                    <p>Pemantauan serapan dan realisasi anggaran sekolah</p>
+                </div>
+            </div>
+
+            <div class="cards">
+                <div class="card">
+                    <div class="card-icon blue"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                    <div class="card-title">Plafon Anggaran</div>
+                    <div class="card-value">${rupiah(totalRencana)}</div>
+                </div>
+                <div class="card">
+                    <div class="card-icon red"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+                    <div class="card-title">Realisasi Pengeluaran</div>
+                    <div class="card-value">${rupiah(totalRealisasi)}</div>
+                </div>
+                <div class="card">
+                    <div class="card-icon green"><i class="fa-solid fa-wallet"></i></div>
+                    <div class="card-title">Sisa Anggaran</div>
+                    <div class="card-value">${rupiah(sisa)}</div>
+                </div>
+                <div class="card">
+                    <div class="card-icon orange"><i class="fa-solid fa-chart-pie"></i></div>
+                    <div class="card-title">Persentase Serapan</div>
+                    <div class="card-value">${persentase}%</div>
+                </div>
+            </div>
+
+            <div class="box">
+                <h3 style="margin-bottom:15px; color: var(--primary);">Detail Pencapaian per Uraian</h3>
+                ${realisasiTable(rencana, realisasi)}
+            </div>
+            `;
+        }
+
+        function realisasiTable(rencana, realisasi){
+            if(rencana.length === 0) return `<p style="color: var(--muted); font-size: 13px;">Belum ada Rencana Anggaran yang dibuat</p>`;
+            
+            // Perbaikan: Akumulasi total realisasi per uraian dengan reduce
+            let mergedData = rencana.map(plan => {
+                let realisasiUraian = realisasi.filter(r => r.uraian === plan.uraian);
+                let realisasiValue = realisasiUraian.reduce((sum, r) => sum + (Number(r.total) || 0), 0);
+                return {
+                    uraian: plan.uraian,
+                    anggaran: plan.total,
+                    realisasi: realisasiValue,
+                    sisa: plan.total - realisasiValue
+                };
+            });
+
+            return `
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Uraian Anggaran</th>
+                            <th>Nilai Anggaran</th>
+                            <th>Telah Terealisasi</th>
+                            <th>Sisa Dana</th>
+                            <th>Status Serapan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${mergedData.map(x => `
+                            <tr>
+                                <td>${x.uraian}</td>
+                                <td>${rupiah(x.anggaran)}</td>
+                                <td style="color: var(--danger); font-weight:bold;">${rupiah(x.realisasi)}</td>
+                                <td style="color: var(--success); font-weight:bold;">${rupiah(x.sisa)}</td>
+                                <td>
+                                    <span style="font-weight: bold; color: ${x.anggaran ? (Math.round(x.realisasi/x.anggaran*100) >= 100 ? 'var(--success)' : 'var(--warning)') : 'var(--muted)'};">
+                                        ${x.anggaran ? Math.round(x.realisasi/x.anggaran*100) : 0}% Terpakai
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            </div>`;
+        }
+
+        /* =====================================================
+           FORMATTING & LOGIKA VALIDASI VOLUME
+        ===================================================== */
+        function formatRupiahInput(elem) {
+            let number_string = elem.value.replace(/[^,\d]/g, '').toString();
+            let split = number_string.split(',');
+            let sisa = split[0].length % 3;
+            let rupiah = split[0].substr(0, sisa);
+            let ribuan = split[0].substr(sisa).match(/\d{3}/gi);
+            if (ribuan) { let separator = sisa ? '.' : ''; rupiah += separator + ribuan.join('.'); }
+            elem.value = split[1] !== undefined ? rupiah + ',' + split[1] : rupiah;
+        }
+
+        // Kalkulasi Rencana Anggaran (Vol x Nilai)
+        function calcAnggaranTotal() {
+            let vol = document.getElementById('anggaran_volume').value.replace(/\./g, '');
+            let nil = document.getElementById('anggaran_nilai').value.replace(/\./g, '');
+            let total = Number(vol) * Number(nil);
+            document.getElementById('calc_total').value = total ? total.toLocaleString('id-ID') : '';
+        }
+
+        // Handle dropdown uraian diganti
+        function autoFillPengeluaran(sel) {
+            let volInput = document.getElementById('pengeluaran_volume');
+            if(volInput) {
+                volInput.value = ""; // Kosongkan saat pindah pilihan
+            }
+            document.getElementById('pengeluaran_total').value = "";
+        }
+
+        // Kalkulasi & Validasi Rencana Pengeluaran
+        function calcPengeluaranTotal() {
+            let volInput = document.getElementById('pengeluaran_volume');
+            if(!volInput) return;
+
+            let sel = document.querySelector('select[name="uraian"]');
+            if (!sel || sel.selectedIndex === 0) return;
+            
+            // Ambil data nilai satuan dan sisa batas volume dari option dropdown yang dipilih
+            let maxVol = Number(sel.options[sel.selectedIndex].getAttribute('data-sisa') || 0);
+            let nilaiSatuan = Number(sel.options[sel.selectedIndex].getAttribute('data-nilai') || 0);
+            let val = Number(volInput.value);
+
+            // Validasi Blokade: Tidak boleh melebihi sisa volume
+            if (val > maxVol) {
+                toast("Volume melebihi sisa anggaran! (Sisa Maksimal: " + maxVol + ")");
+                volInput.value = maxVol;
+                val = maxVol;
+            }
+
+            let total = val * nilaiSatuan;
+            document.getElementById('pengeluaran_total').value = total ? total.toLocaleString('id-ID') : '';
+        }
+
+        /* =====================================================
+           FORM DINAMIS & DROPDOWN FILTER
+        ===================================================== */
+        function openForm(name, id=null){
+            let item = id ? db[name].find(x => x.id === id) : null;
+            document.getElementById("modal").classList.add("show");
+            document.getElementById("modalTitle").innerText = id ? `Edit ${name}` : `Tambah ${name}`;
+            
+            let fields = getDefaultFields(name);
+
+            document.getElementById("dataForm").innerHTML=`
+                <div class="form-grid">
+                ${fields.map(field=>{
+                    let value = item?.[field]??""; let inputHtml = "";
+
+                    // AUTO GEN KODE / NOMOR (PREFIX GIM-)
+                    if (field === "kode" || field === "nomor") {
+                        let seq = id ? value : ("GIM-" + Date.now().toString().slice(-4));
+                        inputHtml = `<input type="text" name="${field}" value="${seq}" readonly style="background:#eef2f6; font-weight:bold;">`;
+                    }
+                    
+                    // ================= RENCANA ANGGARAN =================
+                    else if (field === "uraian" && name === "Rencana Anggaran") { 
+                        inputHtml = `<input type="text" name="${field}" value="${value}" placeholder="Contoh: Pembelian Laptop" required>`; 
+                    }
+                    else if (field === "volume" && name === "Rencana Anggaran") { 
+                        let formattedValue = value ? Number(value).toLocaleString('id-ID') : "";
+                        inputHtml = `<input type="text" id="anggaran_volume" name="${field}" value="${formattedValue}" oninput="formatRupiahInput(this); calcAnggaranTotal()" placeholder="Jumlah barang" required>`; 
+                    }
+                    else if (field === "nilai" && name === "Rencana Anggaran") { 
+                        let formattedValue = value ? Number(value).toLocaleString('id-ID') : "";
+                        inputHtml = `<input type="text" id="anggaran_nilai" name="${field}" value="${formattedValue}" oninput="formatRupiahInput(this); calcAnggaranTotal()" placeholder="Harga satuan" required>`; 
+                    }
+                    else if (field === "total" && name === "Rencana Anggaran") { 
+                        let formattedValue = value ? Number(value).toLocaleString('id-ID') : "";
+                        inputHtml = `<input type="text" id="calc_total" name="${field}" value="${formattedValue}" readonly style="background:#eef2f6" placeholder="Terisi otomatis">`; 
+                    }
+                    else if (field === "sumber_dana") { 
+                        let kats = (db["Kategori Pendapatan"] && db["Kategori Pendapatan"].length > 0) ? db["Kategori Pendapatan"] : [{nama: "Dana BOS"}, {nama: "Sumbangan Pendidikan"}, {nama: "Pendapatan Lain-lain"}];
+                        let opts = kats.map(k => `<option value="${k.nama}" ${value === k.nama ? "selected" : ""}>${k.nama}</option>`).join("");
+                        inputHtml = `<select name="${field}" required><option value="">-- Pilih Sumber Dana --</option>${opts}</select>`; 
+                    }
+                    
+                    // ================= RENCANA PENGELUARAN =================
+                    else if (field === "tanggal") { 
+                        inputHtml = `<input type="date" name="${field}" value="${value}" required>`; 
+                    }
+                    else if (field === "uraian" && name === "Rencana Pengeluaran") { 
+                        let allAnggaran = db["Rencana Anggaran"] || [];
+                        let allPengeluaran = db["Rencana Pengeluaran"] || [];
+                        let opts = `<option value="">-- Pilih Uraian Tersedia --</option>`;
+                        
+                        allAnggaran.forEach(a => {
+                            // Kalkulasi berapa volume yang sudah terpakai oleh uraian ini (Pengecualian saat mengedit row ini)
+                            let terpakai = allPengeluaran
+                                .filter(p => p.uraian === a.uraian && p.id !== id)
+                                .reduce((acc, curr) => acc + (Number(curr.volume) || 0), 0);
+                            
+                            let sisaVol = (Number(a.volume) || 0) - terpakai;
+
+                            // Tampilkan di dropdown jika sisa volume > 0, atau jika uraian ini adalah yang sedang diedit
+                            if (a.uraian === value || sisaVol > 0) {
+                                opts += `<option value="${a.uraian}" data-nilai="${a.nilai}" data-sisa="${sisaVol}" ${value === a.uraian ? "selected" : ""}>${a.uraian} (Sisa Vol:${sisaVol})</option>`;
+                            }
+                        });
+                        inputHtml = `<select name="${field}" onchange="autoFillPengeluaran(this)" required>${opts}</select>`;
+                    }
+                    else if (field === "volume" && name === "Rencana Pengeluaran") { 
+                        inputHtml = `<input type="number" id="pengeluaran_volume" name="${field}" value="${value}" oninput="calcPengeluaranTotal()" placeholder="Ketik volume pemakaian" min="1" required>`; 
+                    }
+                    else if (field === "status") { 
+                        inputHtml = `
+                        <select name="${field}" required>
+                            <option value="Tunai" ${value === "Tunai" ? "selected" : ""}>Tunai</option>
+                            <option value="Transfer" ${value === "Transfer" ? "selected" : ""}>Transfer</option>
+                        </select>`; 
+                    }
+                    else if (field === "total" && name === "Rencana Pengeluaran") { 
+                        let formattedValue = value ? Number(value).toLocaleString('id-ID') : "";
+                        inputHtml = `<input type="text" id="pengeluaran_total" name="${field}" value="${formattedValue}" readonly style="background:#eef2f6" placeholder="Terisi tomatis">`; 
+                    }
+
+                    return `<div class="form-group"><label style="text-transform:capitalize">${field.replace("_", " ")}</label>${inputHtml}</div>`;
+                }).join("")}
+                </div><br>
+                <button type="button" class="btn btn-success" onclick="saveForm('${name}', ${id || "null"})"><i class="fa-solid fa-save"></i> Simpan</button>
+                <button type="button" class="btn btn-light" onclick="closeModal()">Batal</button>
+            `;
+        }
+
+        // PERBARUAN SUSUNAN KOLOM SESUAI INSTRUKSI
+        function getDefaultFields(name){
+            const map = { 
+                "Rencana Anggaran": ["kode", "uraian", "volume", "nilai", "total", "sumber_dana"], 
+                "Rencana Pengeluaran": ["nomor", "tanggal", "uraian", "volume", "total", "status"]
+            };
+            return map[name] || [];
+        }
+
+        /* =====================================================
+           SIMPAN & HAPUS
+        ===================================================== */
+        function saveForm(name, id){
+            const form = document.getElementById("dataForm");
+            if(!form.checkValidity()) { toast("Mohon lengkapi semua kolom!"); return; }
+
+            const fd = new FormData(form); 
+            let obj = {};
+            
+            fd.forEach((value, key) => { 
+                // Format angka khusus (Hapus pemisah ribuan)
+                if (key === "volume" || key === "nilai" || key === "total") { 
+                    obj[key] = Number(value.replace(/\./g, '')); 
+                } else {
+                    obj[key] = value;
+                }
+            });
+
+            if(id){ const index = db[name].findIndex(x => x.id === id); obj.id = id; db[name][index] = obj; toast("Data berhasil diperbarui"); }
+            else{ obj.id = Date.now(); if(!db[name]) db[name] = []; db[name].push(obj); toast("Data berhasil ditambahkan"); }
+            
+            saveDB(); closeModal(); openTable(name);
+        }
+
+        function deleteData(name, id){
+            Swal.fire({
+                title: 'Hapus Data Anggaran',
+                text: "Jika ini adalah Pengeluaran, volumenya akan dikembalikan ke sisa anggaran",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="fa-solid fa-trash"></i> Ya',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    db[name] = db[name].filter(x => x.id !== id);
+                    saveDB(); 
+                    openTable(name); 
+                    Swal.fire({ title: 'Terhapus!', text: 'Data berhasil dihapus', icon: 'success', timer: 1500, showConfirmButton: false });
+                }
+            });
+        }
+
+        // BACA REQUEST DARI SIDEBAR DAN BUKA MENU YANG SESUAI
+        const target = sessionStorage.getItem("targetMenu");
+        if(target === "Rencana Pengeluaran") {
+            openTable(target);
+            document.getElementById('budgetMenu').classList.add('open');
+        } else if (target === "Realisasi") {
+            openBudget();
+            document.getElementById('budgetMenu').classList.add('open');
+        } else {
+            openTable("Rencana Anggaran");
+            document.getElementById('budgetMenu').classList.add('open');
+        }
+        sessionStorage.removeItem("targetMenu"); 
+    </script>
+</body>
+</html>

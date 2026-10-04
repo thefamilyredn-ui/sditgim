@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pemindahan Kas - SIMKU SD GIM</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('show')"><i class="fa-solid fa-bars"></i></button>
+                <h3 id="topTitle">Pemindahan Kas</h3>
+            </div>
+            <div class="user-box">
+                <div class="user-text">
+                    <strong id="userDisplayName">User</strong><br>
+                    <small id="userDisplayRole">Admin</small>
+                </div>
+            </div>
+        </header>
+        <section class="content" id="app"></section>
+    </main>
+
+    <!-- MODAL PINDAH DANA -->
+    <div class="modal" id="modalPindah">
+        <div class="modal-content" style="max-width: 560px;">
+            <div class="modal-header">
+                <div>
+                    <h3>Pindahkan Dana</h3>
+                    <p style="font-size:12px; color:var(--muted); margin-top:4px;">Pindahkan dana antar Tunai ↔ Transfer dalam kategori yang sama</p>
+                </div>
+                <span class="close" onclick="closePindahModal()">&times;</span>
+            </div>
+            <form id="formPindah">
+                <div class="form-grid">
+                    <div class="form-group full">
+                        <label>Kategori Pendapatan</label>
+                        <select id="pk_kategori" required onchange="updatePindahPreview()">
+                            <option value="">-- Pilih Kategori --</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group full">
+                        <label>Arah Pemindahan</label>
+                        <div class="pk-arah-group">
+                            <label class="pk-arah-opt tunai-ke-transfer selected" data-arah="tunai-ke-transfer">
+                                <input type="radio" name="pk_arah" value="tunai-ke-transfer" checked>
+                                <div class="pk-arah-icon"><i class="fa-solid fa-arrow-right"></i></div>
+                                <div>
+                                    <div>Tunai → Transfer</div>
+                                    <div style="font-size:10px; color:var(--muted); font-weight:500;">Setor ke rekening</div>
+                                </div>
+                            </label>
+                            <label class="pk-arah-opt transfer-ke-tunai" data-arah="transfer-ke-tunai">
+                                <input type="radio" name="pk_arah" value="transfer-ke-tunai">
+                                <div class="pk-arah-icon"><i class="fa-solid fa-arrow-left"></i></div>
+                                <div>
+                                    <div>Transfer → Tunai</div>
+                                    <div style="font-size:10px; color:var(--muted); font-weight:500;">Tarik dari rekening</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group full" id="pk_preview_wrapper">
+                        <label>Saldo Saat Ini</label>
+                        <div class="pk-preview" id="pk_preview">
+                            <div class="pk-preview-item tunai">
+                                <div class="pkp-label"><i class="fa-solid fa-money-bill-wave"></i> Tunai</div>
+                                <div class="pkp-value" id="pk_prev_tunai">Rp 0</div>
+                            </div>
+                            <div class="pk-preview-item transfer">
+                                <div class="pkp-label"><i class="fa-solid fa-building-columns"></i> Transfer</div>
+                                <div class="pkp-value" id="pk_prev_transfer">Rp 0</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group full">
+                        <label>Jumlah yang Dipindahkan (Rp)</label>
+                        <input type="text" id="pk_jumlah" required oninput="formatRupiahInput(this); validatePindah();" placeholder="Ketik nominal">
+                        <small id="pk_max_info" style="color: var(--muted); font-size: 11px;"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tanggal</label>
+                        <input type="date" id="pk_tanggal" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Keterangan (Opsional)</label>
+                        <input type="text" id="pk_keterangan" placeholder="Contoh: Setor ke BRI">
+                    </div>
+                </div>
+                <br>
+                <button type="submit" class="btn btn-success"><i class="fa-solid fa-exchange-alt"></i> Pindahkan Dana</button>
+                <button type="button" class="btn btn-light" onclick="closePindahModal()">Batal</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="db.js"></script>
+    <script src="sidebar.js"></script>
+    <script>
+        const targetMenu = sessionStorage.getItem("targetMenu") || 'Pemindahan Kas';
+        renderSidebar(targetMenu);
+        const user = checkAuth("admin"); 
+        document.getElementById("userDisplayName").innerText = user.nama;
+
+        /* =====================================================
+           YEAR FILTER
+        ===================================================== */
+        const TAHUN_AKTIF = (db["Tahun Anggaran"] || []).find(x => x.status === "Aktif")?.tahun || null;
+
+        function getItemYear(item) {
+            if (!item) return "";
+            if (item.tahun) return String(item.tahun);
+            if (item.tanggal) return String(item.tanggal).substring(0, 4);
+            return "";
+        }
+
+        function filterByYear(arr) {
+            if (!Array.isArray(arr)) return [];
+            if (!TAHUN_AKTIF) return [];
+            return arr.filter(x => getItemYear(x) === TAHUN_AKTIF);
+        }
+
+        function getView(collection) { return filterByYear(db[collection] || []); }
+
+        function getKategoriPendapatanList() {
+            let list = db["Kategori Pendapatan"] || [];
+            if (list.length === 0) {
+                list = [{nama: "Dana BOS"}, {nama: "Sumbangan Pendidikan"}, {nama: "Pendapatan Lain-lain"}];
+                db["Kategori Pendapatan"] = list;
+                saveDB();
+            }
+            return list.map(k => typeof k === 'string' ? {nama: k} : {nama: k.nama});
+        }
+
+        function goToMasterTahun() {
+            sessionStorage.setItem("targetMenu", "Tahun Anggaran");
+            window.location.href = "master.html";
+        }
+
+        function formatRupiahInput(elem) {
+            let number_string = elem.value.replace(/[^,\d]/g, '').toString();
+            let split = number_string.split(',');
+            let sisa = split[0].length % 3;
+            let rupiah = split[0].substr(0, sisa);
+            let ribuan = split[0].substr(sisa).match(/\d{3}/gi);
+            if (ribuan) { let sep = sisa ? '.' : ''; rupiah += sep + ribuan.join('.'); }
+            elem.value = split[1] !== undefined ? rupiah + ',' + split[1] : rupiah;
+        }
+
+        /* =====================================================
+           HITUNG SALDO TUNAI & TRANSFER PER KATEGORI
+        ===================================================== */
+        function hitungSaldoPerKategori() {
+            let pendapatan = getView("Pendapatan");
+            let pengeluaran = getView("Rencana Pengeluaran").filter(x => !x._from_guru);
+            let pengajuan = getView("Pengajuan").filter(x => x.approval_status === "Disetujui");
+            let pemindahan = getView("Pemindahan Kas");
+            
+            let kategoris = getKategoriPendapatanList().map(k => k.nama);
+            let result = {};
+            kategoris.forEach(kat => { result[kat] = { tunai: 0, transfer: 0, countTrx: 0 }; });
+            
+            // Pendapatan
+            pendapatan.forEach(x => {
+                let kat = x.kategori;
+                if (!kat) return;
+                if (!result[kat]) result[kat] = { tunai: 0, transfer: 0, countTrx: 0 };
+                let st = (x.status || "Tunai").toLowerCase();
+                if (st === "transfer") result[kat].transfer += Number(x.jumlah) || 0;
+                else result[kat].tunai += Number(x.jumlah) || 0;
+                result[kat].countTrx++;
+            });
+            
+            // Pengeluaran admin
+            pengeluaran.forEach(x => {
+                let kat = x.sumber_dana;
+                if (!kat || !result[kat]) return;
+                let st = (x.status || "Tunai").toLowerCase();
+                if (st === "transfer") result[kat].transfer -= Number(x.total) || 0;
+                else result[kat].tunai -= Number(x.total) || 0;
+            });
+            
+            // Pengajuan guru approved
+            pengajuan.forEach(x => {
+                let kat = x.sumber_dana;
+                if (!kat || !result[kat]) return;
+                let st = (x.status || "Tunai").toLowerCase();
+                if (st === "transfer") result[kat].transfer -= Number(x.total) || 0;
+                else result[kat].tunai -= Number(x.total) || 0;
+            });
+            
+            // Pemindahan
+            pemindahan.forEach(x => {
+                let kat = x.kategori;
+                if (!result[kat]) result[kat] = { tunai: 0, transfer: 0, countTrx: 0 };
+                let jml = Number(x.jumlah) || 0;
+                if (x.dari === "Transfer" && x.ke === "Tunai") {
+                    result[kat].transfer -= jml;
+                    result[kat].tunai += jml;
+                } else if (x.dari === "Tunai" && x.ke === "Transfer") {
+                    result[kat].tunai -= jml;
+                    result[kat].transfer += jml;
+                }
+            });
+            
+            return result;
+        }
+
+        /* =====================================================
+           RENDER HALAMAN
+        ===================================================== */
+        let pindahState = {
+            data: [], filtered: [], page: 1, pageSize: 10,
+            startDate: "", endDate: "", filterField: "", filterValue: ""
+        };
+
+        function renderPage() {
+            if (!TAHUN_AKTIF) {
+                document.getElementById("app").innerHTML = `
+                <div class="page-header">
+                    <div><h1>Tahun Anggaran Belum Aktif</h1></div>
+                </div>
+                <div class="box" style="text-align:center; padding: 50px;">
+                    <i class="fa-solid fa-calendar-xmark" style="font-size: 64px; color: var(--warning); display: block; margin-bottom: 20px;"></i>
+                    <h2 style="color: var(--primary); margin-bottom: 12px;">Tidak Ada Tahun Anggaran Aktif</h2>
+                    <p style="color: var(--muted); max-width: 500px; margin: 0 auto 20px;">
+                        Silakan aktifkan salah satu tahun anggaran di menu <b>Master Data → Tahun Anggaran</b> terlebih dahulu.
+                    </p>
+                    <button class="btn btn-primary" onclick="goToMasterTahun()">
+                        <i class="fa-solid fa-arrow-right"></i> Buka Pengaturan Tahun Anggaran
+                    </button>
+                </div>`;
+                return;
+            }
+
+            let saldoMap = hitungSaldoPerKategori();
+            let kategoris = Object.keys(saldoMap).filter(k => saldoMap[k].countTrx > 0);
+            
+            let totalTunaiAll = 0, totalTransferAll = 0;
+            kategoris.forEach(k => {
+                totalTunaiAll += saldoMap[k].tunai;
+                totalTransferAll += saldoMap[k].transfer;
+            });
+            let totalAll = totalTunaiAll + totalTransferAll;
+
+            // Widget HTML
+            let widgetHtml = "";
+            if (kategoris.length === 0) {
+                widgetHtml = `<div class="box" style="text-align:center; padding: 40px; color: var(--muted);">
+                    <i class="fa-solid fa-inbox" style="font-size: 40px; opacity: 0.3; display: block; margin-bottom: 12px;"></i>
+                    Belum ada data pendapatan untuk tahun ${TAHUN_AKTIF}.
+                </div>`;
+            } else {
+                widgetHtml = `<div class="pindah-kategori-grid">
+                    ${kategoris.map(kat => {
+                        let s = saldoMap[kat];
+                        let tunai = s.tunai;
+                        let transfer = s.transfer;
+                        let total = tunai + transfer;
+                        return `
+                        <div class="pindah-kategori-card" onclick="openPindahModal('${kat.replace(/'/g, "\\'")}')">
+                            <div class="pk-header">
+                                <div class="pk-title">
+                                    <i class="fa-solid fa-wallet" style="color: var(--primary2);"></i>
+                                    ${kat}
+                                </div>
+                                <div class="pk-total">Total: ${rupiah(total)}</div>
+                            </div>
+                            <div class="pk-body">
+                                <div class="pk-balance tunai">
+                                    <div class="pk-label"><i class="fa-solid fa-money-bill-wave"></i> Tunai</div>
+                                    <div class="pk-value">${rupiah(tunai)}</div>
+                                    <div class="pk-mini">Saldo tersedia</div>
+                                </div>
+                                <div class="pk-balance transfer">
+                                    <div class="pk-label"><i class="fa-solid fa-building-columns"></i> Transfer</div>
+                                    <div class="pk-value">${rupiah(transfer)}</div>
+                                    <div class="pk-mini">Saldo tersedia</div>
+                                </div>
+                            </div>
+                        </div>`;
+                    }).join("")}
+                </div>`;
+            }
+
+            // Build data riwayat pemindahan
+            pindahState.data = getView("Pemindahan Kas").slice().sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal));
+            pindahState.filtered = pindahState.data.slice();
+            pindahState.page = 1;
+
+            document.getElementById("app").innerHTML = `
+            <div class="page-header">
+                <div>
+                    <h1>Pemindahan Kas</h1>
+                    <p>Tahun ${TAHUN_AKTIF} • Pindahkan dana antar Tunai ↔ Transfer per kategori pendapatan</p>
+                </div>
+                <button class="btn btn-primary" onclick="openPindahModal()">
+                    <i class="fa-solid fa-exchange-alt"></i> Pindahkan Dana
+                </button>
+            </div>
+
+            <!-- HERO -->
+            <div class="page-hero blue">
+                <div>
+                    <div class="hero-label">Total Dana Tersedia (Semua Kategori)</div>
+                    <div class="hero-value">${rupiah(totalAll)}</div>
+                    <div class="hero-sub">
+                        💵 Tunai: <b>${rupiah(totalTunaiAll)}</b> &nbsp;•&nbsp; 🏦 Transfer: <b>${rupiah(totalTransferAll)}</b>
+                    </div>
+                </div>
+                <div class="hero-icon"><i class="fa-solid fa-right-left"></i></div>
+            </div>
+
+            <!-- WIDGET PER KATEGORI -->
+            <h3 style="margin-bottom: 14px; color: var(--primary); font-size: 15px;">
+                <i class="fa-solid fa-folder-open"></i> Saldo Tunai & Transfer per Kategori
+            </h3>
+            ${widgetHtml}
+
+            <!-- TABEL RIWAYAT -->
+            <div class="box" style="margin-top: 24px;">
+                <h3 style="margin-bottom: 15px; color: var(--primary); font-size: 15px;">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Riwayat Pemindahan Dana
+                </h3>
+
+                <div class="filter-bar">
+                    <div class="fb-group"><label><i class="fa-solid fa-calendar"></i> Dari Tanggal</label><input type="date" id="phStart"></div>
+                    <div class="fb-group"><label><i class="fa-solid fa-calendar"></i> Sampai Tanggal</label><input type="date" id="phEnd"></div>
+                    <div class="fb-group">
+                        <label>Filter Kolom</label>
+                        <select id="phField">
+                            <option value="">-- Semua Kolom --</option>
+                            <option value="tanggal">Tanggal</option>
+                            <option value="kategori">Kategori</option>
+                            <option value="dari">Dari</option>
+                            <option value="ke">Ke</option>
+                            <option value="keterangan">Keterangan</option>
+                        </select>
+                    </div>
+                    <div class="fb-group"><label>Kata Kunci</label><input type="text" id="phValue" placeholder="Cari..."></div>
+                    <div class="fb-actions">
+                        <button class="btn btn-primary btn-sm" onclick="applyPindahFilter()"><i class="fa-solid fa-filter"></i> Terapkan</button>
+                        <button class="btn btn-light btn-sm" onclick="resetPindahFilter()">Reset</button>
+                    </div>
+                </div>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 50px; text-align: center;">No</th>
+                                <th>Tanggal</th>
+                                <th>Kategori</th>
+                                <th>Arah Pemindahan</th>
+                                <th style="text-align: right;">Jumlah</th>
+                                <th>Keterangan</th>
+                                <th style="text-align: center;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pindahTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="pagination-bar">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <div>Baris per halaman:</div>
+                        <select id="phPageSize" onchange="changePindahPageSize(this.value)" style="padding: 5px 8px; border: 1px solid #dce3ea; border-radius: 6px; font-size: 12px;">
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                        <div id="phPageInfo"></div>
+                    </div>
+                    <div class="pg-buttons">
+                        <button onclick="changePindahPage(-1)" id="phPrevBtn"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                        <span id="phPageLabel" style="padding: 0 8px; font-weight: bold;"></span>
+                        <button onclick="changePindahPage(1)" id="phNextBtn">Next <i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>`;
+
+            applyPindahFilter(true);
+        }
+
+        /* =====================================================
+           FILTER & PAGINATION RIWAYAT
+        ===================================================== */
+        function applyPindahFilter(keepFilter = false) {
+            if (!keepFilter) {
+                pindahState.startDate = document.getElementById("phStart")?.value || "";
+                pindahState.endDate = document.getElementById("phEnd")?.value || "";
+                pindahState.filterField = document.getElementById("phField")?.value || "";
+                pindahState.filterValue = (document.getElementById("phValue")?.value || "").trim();
+                pindahState.page = 1;
+            }
+            let filtered = pindahState.data.slice();
+            if (pindahState.startDate) filtered = filtered.filter(x => x.tanggal && x.tanggal >= pindahState.startDate);
+            if (pindahState.endDate) filtered = filtered.filter(x => x.tanggal && x.tanggal <= pindahState.endDate);
+            if (pindahState.filterValue) {
+                let kw = pindahState.filterValue.toLowerCase();
+                if (pindahState.filterField) {
+                    filtered = filtered.filter(x => String(x[pindahState.filterField] || "").toLowerCase().includes(kw));
+                } else {
+                    filtered = filtered.filter(x => Object.values(x).join(" ").toLowerCase().includes(kw));
+                }
+            }
+            pindahState.filtered = filtered;
+            renderPindahTable();
+        }
+
+        function resetPindahFilter() {
+            ["phStart","phEnd","phField","phValue"].forEach(id => {
+                let el = document.getElementById(id);
+                if (el) el.value = "";
+            });
+            pindahState.startDate = "";
+            pindahState.endDate = "";
+            pindahState.filterField = "";
+            pindahState.filterValue = "";
+            pindahState.page = 1;
+            pindahState.filtered = pindahState.data.slice();
+            renderPindahTable();
+        }
+
+        function changePindahPageSize(size) {
+            pindahState.pageSize = Number(size);
+            pindahState.page = 1;
+            renderPindahTable();
+        }
+
+        function changePindahPage(delta) {
+            let totalPages = Math.ceil(pindahState.filtered.length / pindahState.pageSize) || 1;
+            let newPage = pindahState.page + delta;
+            if (newPage < 1) newPage = 1;
+            if (newPage > totalPages) newPage = totalPages;
+            pindahState.page = newPage;
+            renderPindahTable();
+        }
+
+        function renderPindahTable() {
+            let s = pindahState;
+            let totalData = s.filtered.length;
+            let pageSize = s.pageSize;
+            let totalPages = Math.ceil(totalData / pageSize) || 1;
+            if (s.page > totalPages) s.page = totalPages;
+            let startIdx = (s.page - 1) * pageSize;
+            let endIdx = Math.min(startIdx + pageSize, totalData);
+            let pageData = s.filtered.slice(startIdx, endIdx);
+
+            let tbody = document.getElementById("pindahTableBody");
+            if (!tbody) return;
+
+            if (pageData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 30px; color: var(--muted);">Belum ada riwayat pemindahan dana.</td></tr>`;
+            } else {
+                tbody.innerHTML = pageData.map((x, i) => {
+                    let arahBadge = x.dari === "Tunai"
+                        ? `<span style="background:#f0fdf4; color:#166534; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:bold; display:inline-flex; align-items:center; gap:6px;">
+                             <i class="fa-solid fa-money-bill-wave"></i> Tunai
+                             <i class="fa-solid fa-arrow-right" style="opacity:0.5;"></i>
+                             <i class="fa-solid fa-building-columns"></i> Transfer
+                           </span>`
+                        : `<span style="background:#eff6ff; color:#1e40af; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:bold; display:inline-flex; align-items:center; gap:6px;">
+                             <i class="fa-solid fa-building-columns"></i> Transfer
+                             <i class="fa-solid fa-arrow-right" style="opacity:0.5;"></i>
+                             <i class="fa-solid fa-money-bill-wave"></i> Tunai
+                           </span>`;
+                    return `<tr>
+                        <td style="text-align:center;">${startIdx + i + 1}</td>
+                        <td>${formatDate(x.tanggal)}</td>
+                        <td><strong>${x.kategori}</strong></td>
+                        <td>${arahBadge}</td>
+                        <td style="text-align:right; font-weight:bold; color:var(--primary);">${rupiah(x.jumlah)}</td>
+                        <td>${x.keterangan || "-"}</td>
+                        <td style="text-align:center;">
+                            <button class="btn btn-light btn-sm" onclick="hapusPindah(${x.id})" style="background:#fff5f5; border:1px solid #ffcccc;" title="Hapus">
+                                <i class="fa-solid fa-trash" style="color:#dc3545;"></i>
+                            </button>
+                        </td>
+                    </tr>`;
+                }).join("");
+            }
+
+            let infoEl = document.getElementById("phPageInfo");
+            if (infoEl) infoEl.innerHTML = totalData > 0 
+                ? `Menampilkan <b>${startIdx + 1}-${endIdx}</b> dari <b>${totalData}</b> data` 
+                : `0 data`;
+            let labelEl = document.getElementById("phPageLabel");
+            if (labelEl) labelEl.innerText = `Hal ${s.page} / ${totalPages}`;
+            let prevBtn = document.getElementById("phPrevBtn"); if (prevBtn) prevBtn.disabled = s.page <= 1;
+            let nextBtn = document.getElementById("phNextBtn"); if (nextBtn) nextBtn.disabled = s.page >= totalPages;
+        }
+
+        /* =====================================================
+           MODAL PINDAH
+        ===================================================== */
+        function openPindahModal(kategori = null) {
+            document.getElementById("formPindah").reset();
+            
+            // Isi kategori
+            let kategoris = getKategoriPendapatanList();
+            let opts = kategoris.map(k => `<option value="${k.nama}" ${kategori === k.nama ? "selected" : ""}>${k.nama}</option>`).join("");
+            document.getElementById("pk_kategori").innerHTML = `<option value="">-- Pilih Kategori --</option>${opts}`;
+            
+            // Reset arah ke Tunai → Transfer
+            document.querySelectorAll(".pk-arah-opt").forEach(el => el.classList.remove("selected"));
+            document.querySelector(".pk-arah-opt.tunai-ke-transfer").classList.add("selected");
+            document.querySelector('input[name="pk_arah"][value="tunai-ke-transfer"]').checked = true;
+            
+            // Set tanggal hari ini
+            document.getElementById("pk_tanggal").value = new Date().toISOString().split("T")[0];
+            document.getElementById("pk_jumlah").value = "";
+            document.getElementById("pk_keterangan").value = "";
+            
+            // Preview kalau kategori dipilih
+            updatePindahPreview();
+            
+            document.getElementById("modalPindah").classList.add("show");
+        }
+
+        function closePindahModal() {
+            document.getElementById("modalPindah").classList.remove("show");
+        }
+
+        function updatePindahPreview() {
+            let kat = document.getElementById("pk_kategori").value;
+            let prevTunai = document.getElementById("pk_prev_tunai");
+            let prevTransfer = document.getElementById("pk_prev_transfer");
+            let maxInfo = document.getElementById("pk_max_info");
+            
+            if (!kat) {
+                prevTunai.innerText = "Rp 0";
+                prevTransfer.innerText = "Rp 0";
+                maxInfo.innerText = "";
+                return;
+            }
+            
+            let saldoMap = hitungSaldoPerKategori();
+            let s = saldoMap[kat] || { tunai: 0, transfer: 0 };
+            prevTunai.innerText = rupiah(s.tunai);
+            prevTransfer.innerText = rupiah(s.transfer);
+            
+            validatePindah();
+        }
+
+        function validatePindah() {
+            let kat = document.getElementById("pk_kategori").value;
+            let arah = document.querySelector('input[name="pk_arah"]:checked')?.value || "tunai-ke-transfer";
+            let jumlah = Number((document.getElementById("pk_jumlah").value || "").replace(/\./g, "")) || 0;
+            let maxInfo = document.getElementById("pk_max_info");
+            
+            if (!kat) { maxInfo.innerText = ""; return; }
+            
+            let saldoMap = hitungSaldoPerKategori();
+            let s = saldoMap[kat] || { tunai: 0, transfer: 0 };
+            let maxSaldo = (arah === "tunai-ke-transfer") ? s.tunai : s.transfer;
+            let fromLabel = (arah === "tunai-ke-transfer") ? "Tunai" : "Transfer";
+            
+            if (jumlah > maxSaldo) {
+                maxInfo.style.color = "var(--danger)";
+                maxInfo.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Saldo ${fromLabel} tidak cukup. Maksimal: <b>${rupiah(maxSaldo)}</b>`;
+            } else {
+                maxInfo.style.color = "var(--muted)";
+                maxInfo.innerHTML = `Saldo ${fromLabel} tersedia: <b style="color:var(--success);">${rupiah(maxSaldo)}</b>`;
+            }
+        }
+
+        // Radio button pilih arah
+        document.querySelectorAll(".pk-arah-opt").forEach(opt => {
+            opt.addEventListener("click", function() {
+                document.querySelectorAll(".pk-arah-opt").forEach(el => el.classList.remove("selected"));
+                this.classList.add("selected");
+                this.querySelector('input[type="radio"]').checked = true;
+                validatePindah();
+            });
+        });
+
+        // Submit
+        document.getElementById("formPindah").addEventListener("submit", function(e) {
+            e.preventDefault();
+            
+            let kat = document.getElementById("pk_kategori").value;
+            let arah = document.querySelector('input[name="pk_arah"]:checked')?.value || "tunai-ke-transfer";
+            let jumlah = Number((document.getElementById("pk_jumlah").value || "").replace(/\./g, "")) || 0;
+            let tanggal = document.getElementById("pk_tanggal").value;
+            let keterangan = document.getElementById("pk_keterangan").value.trim();
+            
+            if (!kat) { toast("Pilih kategori terlebih dahulu!"); return; }
+            if (!jumlah || jumlah <= 0) { toast("Masukkan jumlah yang valid!"); return; }
+            
+            let saldoMap = hitungSaldoPerKategori();
+            let s = saldoMap[kat] || { tunai: 0, transfer: 0 };
+            let maxSaldo = (arah === "tunai-ke-transfer") ? s.tunai : s.transfer;
+            let fromLabel = (arah === "tunai-ke-transfer") ? "Tunai" : "Transfer";
+            let toLabel = (arah === "tunai-ke-transfer") ? "Transfer" : "Tunai";
+            
+            if (jumlah > maxSaldo) {
+                Swal.fire({
+                    title: 'Saldo Tidak Cukup!',
+                    html: `Saldo <b>${fromLabel}</b> kategori <b>${kat}</b> hanya <b>${rupiah(maxSaldo)}</b>, sedangkan Anda ingin memindahkan <b>${rupiah(jumlah)}</b>.`,
+                    icon: 'error'
+                });
+                return;
+            }
+            
+            let confText = `Pindahkan <b>${rupiah(jumlah)}</b> dari <b>${fromLabel}</b> ke <b>${toLabel}</b> di kategori <b>${kat}</b>?`;
+            
+            Swal.fire({
+                title: 'Konfirmasi Pemindahan',
+                html: confText,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#198754',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="fa-solid fa-exchange-alt"></i> Ya, Pindahkan',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    if (!db["Pemindahan Kas"]) db["Pemindahan Kas"] = [];
+                    db["Pemindahan Kas"].push({
+                        id: Date.now(),
+                        tahun: TAHUN_AKTIF,
+                        tanggal: tanggal,
+                        kategori: kat,
+                        dari: fromLabel,
+                        ke: toLabel,
+                        jumlah: jumlah,
+                        keterangan: keterangan,
+                        created_at: new Date().toISOString()
+                    });
+                    saveDB();
+                    closePindahModal();
+                    renderPage();
+                    Swal.fire({
+                        title: 'Berhasil!',
+                        text: `Dana ${rupiah(jumlah)} berhasil dipindahkan dari ${fromLabel} ke ${toLabel}.`,
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
+            });
+        });
+
+        /* =====================================================
+           HAPUS RIWAYAT
+        ===================================================== */
+        function hapusPindah(id) {
+            Swal.fire({
+                title: 'Hapus Riwayat Pemindahan?',
+                text: 'Saldo akan dikembalikan seperti semula.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="fa-solid fa-trash"></i> Ya, Hapus',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    db["Pemindahan Kas"] = (db["Pemindahan Kas"] || []).filter(x => x.id !== id);
+                    saveDB();
+                    renderPage();
+                    Swal.fire({ title: 'Terhapus!', text: 'Saldo telah dikembalikan.', icon: 'success', timer: 1500, showConfirmButton: false });
+                }
+            });
+        }
+
+        /* =====================================================
+           INIT
+        ===================================================== */
+        renderPage();
+    </script>
+</body>
+</html>

@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="login-container">
+<div class="login-container">
         <div class="login-box">
             <h2><i class="fa-solid fa-school"></i> SIMKU SD GIM</h2>
             <p style="margin-bottom: 20px; color: var(--muted);">Silakan login ke akun Anda</p>
@@ -24,8 +24,11 @@
 
     <script src="db.js"></script>
     <script>
-        // Jika sudah login, langsung ke dashboard
-        if(localStorage.getItem("currentUser")) window.location.href = "dashboard.html";
+        // Cek jika pengguna sudah login sebelumnya
+        const existingUser = JSON.parse(localStorage.getItem("currentUser"));
+        if (existingUser) {
+            window.location.href = existingUser.role === "guru" ? "guru.html" : "dashboard.html";
+        }
 
         document.getElementById("loginForm").onsubmit = function(e) {
             e.preventDefault();
@@ -35,7 +38,12 @@
 
             if (valid) {
                 localStorage.setItem("currentUser", JSON.stringify(valid));
-                window.location.href = "dashboard.html";
+                // Arahkan ke halaman sesuai hak akses / role
+                if (valid.role === "guru") {
+                    window.location.href = "guru.html";
+                } else {
+                    window.location.href = "dashboard.html";
+                }
             } else {
                 document.getElementById("loginError").style.display = "block";
             }

@@ -6,16 +6,11 @@
     <title>Anggaran - SIMKU SD GIM</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <!-- Library SweetAlert2 untuk Popup -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
-    <!-- ================= SIDEBAR UNIVERSAL ================= -->
-    <aside class="sidebar" id="sidebar">
-        
-    </aside>
+    <aside class="sidebar" id="sidebar"></aside>
 
-    <!-- ================= MAIN ================= -->
     <main class="main">
         <header class="topbar">
             <div class="topbar-left">
@@ -29,11 +24,9 @@
                 </div>
             </div>
         </header>
-
         <section class="content" id="app"></section>
     </main>
 
-    <!-- ================= MODAL & TOAST ================= -->
     <div class="modal" id="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -43,206 +36,2107 @@
             <form id="dataForm"></form>
         </div>
     </div>
+
+    <div class="modal" id="modalKategori">
+        <div class="modal-content" style="max-width: 560px;">
+            <div class="modal-header">
+                <div>
+                    <h3>Kelola Kategori Pendapatan</h3>
+                    <p style="font-size:12px; color:var(--muted); margin-top:5px;">Tambahkan kategori baru atau ubah nama kategori existing</p>
+                </div>
+                <span class="close" onclick="closeKategoriModal()">&times;</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <input type="text" id="newKategoriName" placeholder="Nama kategori baru..." style="flex: 1; padding: 11px; border: 1px solid #dce3ea; border-radius: 8px;" onkeypress="if(event.key==='Enter'){event.preventDefault(); tambahKategoriPendapatan();}">
+                <button class="btn btn-primary" onclick="tambahKategoriPendapatan()"><i class="fa-solid fa-plus"></i> Tambah</button>
+            </div>
+            <div id="kategoriListContainer" style="max-height: 380px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+        <!-- Modal Kelola Kategori Belanja -->
+    <div class="modal" id="modalKategoriBelanja">
+        <div class="modal-content" style="max-width: 560px;">
+            <div class="modal-header">
+                <div>
+                    <h3>Kelola Kategori Belanja</h3>
+                    <p style="font-size:12px; color:var(--muted); margin-top:5px;">Kategori yang ditambahkan akan otomatis muncul di form Rencana Anggaran</p>
+                </div>
+                <span class="close" onclick="closeKategoriBelanjaModal()">&times;</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <input type="text" id="newKategoriBelanjaName" placeholder="Nama kategori belanja baru..." style="flex: 1; padding: 11px; border: 1px solid #dce3ea; border-radius: 8px;" onkeypress="if(event.key==='Enter'){event.preventDefault(); tambahKategoriBelanja();}">
+                <button class="btn btn-primary" onclick="tambahKategoriBelanja()"><i class="fa-solid fa-plus"></i> Tambah</button>
+            </div>
+            <div id="kategoriBelanjaListContainer" style="max-height: 380px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+        <!-- Modal Detail Kategori Pengeluaran -->
+    <div class="modal" id="modalDetailKategoriPengeluaran">
+        <div class="modal-content" style="max-width: 1050px; padding: 0;">
+            <div style="background: linear-gradient(135deg, #dc3545, #a02c39); color: white; padding: 20px 25px; border-radius: 14px 14px 0 0;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:15px;">
+                    <div>
+                        <h3 id="detailKatPengTitle" style="margin: 0; font-size: 17px;">Detail Kategori</h3>
+                        <p id="detailKatPengSubtitle" style="font-size: 12px; opacity: 0.95; margin-top: 6px; line-height: 1.5;"></p>
+                    </div>
+                    <span class="close" onclick="closeDetailKategoriPengeluaran()" style="color: white; font-size: 24px; opacity: 0.8;">&times;</span>
+                </div>
+            </div>
+            <div id="detailKatPengContent" style="padding: 25px;"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="modalDetailRab">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="rab-detail-header">
+                <div>
+                    <h3 style="margin:0; font-size:17px;" id="detailRabTitle">RAB Guru</h3>
+                    <p style="font-size:12px; opacity:0.85; margin-top:4px;" id="detailRabSubtitle"></p>
+                </div>
+                <span class="close" onclick="closeDetailRab()" style="color:white; font-size:24px;">&times;</span>
+            </div>
+            <div id="detailRabSummary"></div>
+            <div id="detailRabContent"></div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script src="db.js"></script>
     <script src="sidebar.js"></script>
     <script>
-        const targetMenu = sessionStorage.getItem("targetMenu") || 'Rencana Anggaran';
+        const targetMenu = sessionStorage.getItem("targetMenu") || 'Pendapatan';
         renderSidebar(targetMenu);
-
         const user = checkAuth("admin"); 
         document.getElementById("userDisplayName").innerText = user.nama;
+
+        /* =====================================================
+           YEAR FILTER — LOGIKA UTAMA TAHUN ANGGARAN TUNGGAL
+        ===================================================== */
+        const TAHUN_AKTIF = (db["Tahun Anggaran"] || []).find(x => x.status === "Aktif")?.tahun || null;
+
+        function getItemYear(item) {
+            if (!item) return "";
+            if (item.tahun) return String(item.tahun);
+            if (item.tanggal) return String(item.tanggal).substring(0, 4);
+            return "";
+        }
+
+        function filterYear(arr) {
+            if (!Array.isArray(arr)) return [];
+            if (!TAHUN_AKTIF) return [];
+            return arr.filter(x => getItemYear(x) === TAHUN_AKTIF);
+        }
+
+        function getView(collection) {
+            let arr = db[collection] || [];
+            if (collection === "Kategori Pendapatan" || collection === "Pengguna" || collection === "Hak Akses" || collection === "Tahun Anggaran") {
+                return arr;
+            }
+            return filterYear(arr);
+        }
+
+        function checkTahunAktif() {
+            if (!TAHUN_AKTIF) {
+                Swal.fire({
+                    title: 'Tidak Ada Tahun Aktif',
+                    html: `Silakan aktifkan salah satu tahun anggaran di menu <b>Master Data → Tahun Anggaran</b> terlebih dahulu sebelum mengelola data anggaran.`,
+                    icon: 'warning',
+                    confirmButtonText: 'Mengerti',
+                    confirmButtonColor: '#1d5d9b'
+                });
+                return false;
+            }
+            return true;
+        }
 
         function closeMobileSidebar() {
             const sidebar = document.getElementById('sidebar');
             if (sidebar.classList.contains('show')) sidebar.classList.remove('show');
         }
-
         function closeModal() { document.getElementById("modal").classList.remove("show"); }
 
+        /* ============== STATE BUKTI BAYAR ============== */
+        let tempBuktiBayar = { data: "", nama: "" };
+
+        function handleBuktiUpload(input) {
+            if (!input.files || !input.files[0]) return;
+            let file = input.files[0];
+            if (file.size > 3 * 1024 * 1024) { toast("Ukuran file maksimal 3MB!"); input.value = ""; return; }
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                let dataUrl = e.target.result;
+                if (file.type.startsWith("image/")) {
+                    compressImage(dataUrl, 900, 0.7, function(compressed) {
+                        tempBuktiBayar = { data: compressed, nama: file.name };
+                        renderBuktiPreview(compressed, file.name, "image");
+                    });
+                } else {
+                    tempBuktiBayar = { data: dataUrl, nama: file.name };
+                    renderBuktiPreview(dataUrl, file.name, "pdf");
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function compressImage(dataUrl, maxWidth, quality, callback) {
+            let img = new Image();
+            img.onload = function() {
+                let canvas = document.createElement("canvas");
+                let ratio = img.width > maxWidth ? maxWidth / img.width : 1;
+                canvas.width = img.width * ratio;
+                canvas.height = img.height * ratio;
+                let ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                callback(canvas.toDataURL("image/jpeg", quality));
+            };
+            img.src = dataUrl;
+        }
+
+        function renderBuktiPreview(dataUrl, nama, type) {
+            let preview = document.getElementById("bukti_preview");
+            if (!preview) return;
+            let thumbHtml = type === "image"
+                ? `<img src="${dataUrl}" style="max-width:120px; max-height:120px; border:1px solid #dce3ea; border-radius:8px; padding:3px; background:white; object-fit:cover;">`
+                : `<div style="padding:16px 22px; background:#fef2f2; border-radius:8px; border:1px solid #fecaca; display:inline-block; text-align:center;">
+                    <i class="fa-solid fa-file-pdf" style="font-size:28px; color:#dc3545;"></i>
+                    <div style="font-size:11px; color:var(--muted); margin-top:4px;">PDF</div>
+                   </div>`;
+            preview.innerHTML = `
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    ${thumbHtml}
+                    <div>
+                        <div style="font-size:12px; color:var(--text); margin-bottom:6px; font-weight:bold; word-break:break-all;">${nama}</div>
+                        <button type="button" class="btn btn-light btn-sm" onclick="hapusBukti()" style="background:#fff5f5; border:1px solid #ffcccc; color:#dc3545;">
+                            <i class="fa-solid fa-trash"></i> Hapus
+                        </button>
+                    </div>
+                </div>`;
+        }
+
+        function hapusBukti() {
+            tempBuktiBayar = { data: "", nama: "" };
+            let fi = document.getElementById("bukti_file"); if (fi) fi.value = "";
+            let preview = document.getElementById("bukti_preview"); if (preview) preview.innerHTML = "";
+        }
+
+        function lihatBukti(id) {
+            let item = (db["Rencana Pengeluaran"] || []).find(x => x.id === id);
+            if (!item || !item.bukti_bayar) { toast("Bukti tidak ditemukan"); return; }
+            let isPdf = item.bukti_bayar.startsWith("data:application/pdf");
+            let contentHtml = isPdf 
+                ? `<iframe src="${item.bukti_bayar}" style="width:100%; height:500px; border:none; border-radius:8px;"></iframe>`
+                : `<img src="${item.bukti_bayar}" style="max-width:100%; max-height:65vh; border-radius:8px; display:block; margin:0 auto;">`;
+            Swal.fire({
+                title: 'Bukti Bayar',
+                html: `
+                    <div style="text-align:center; margin-bottom:12px; font-size:12px; color:var(--muted);">
+                        <b style="color:var(--text);">${item.uraian}</b><br>
+                        ${item.bukti_bayar_nama || '-'} • ${formatDate(item.tanggal)} • ${rupiah(item.total)}
+                    </div>
+                    ${contentHtml}
+                    <div style="margin-top:15px; display:flex; gap:8px; justify-content:center;">
+                        <a href="${item.bukti_bayar}" download="${item.bukti_bayar_nama || 'bukti'}" class="btn btn-primary" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; padding:8px 16px;">
+                            <i class="fa-solid fa-download"></i> Download
+                        </a>
+                    </div>`,
+                width: isPdf ? '750px' : '650px',
+                showConfirmButton: false,
+                showCloseButton: true
+            });
+        }
+
         /* =====================================================
-           TAMPILAN TABEL CRUD
+           HELPER
+        ===================================================== */
+        function getKategoriPendapatanList() {
+            let list = db["Kategori Pendapatan"] || [];
+            if (list.length === 0) {
+                list = [{nama: "Dana BOS"}, {nama: "Sumbangan Pendidikan"}, {nama: "Pendapatan Lain-lain"}];
+                db["Kategori Pendapatan"] = list;
+                saveDB();
+            }
+            let normalized = list.map(k => typeof k === 'string' ? {nama: k} : {nama: k.nama});
+            if (JSON.stringify(list) !== JSON.stringify(normalized)) {
+                db["Kategori Pendapatan"] = normalized;
+                saveDB();
+            }
+            return normalized;
+        }
+        function getGuruList() { return (db["Pengguna"] || []).filter(u => u.role === "guru"); }
+
+                /* =====================================================
+           FORMAT TANGGAL INDONESIA (untuk cetak rekap)
+        ===================================================== */
+        function formatTanggalIndo(dateStr) {
+            if (!dateStr) return "-";
+            const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+                            "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            const d = new Date(dateStr);
+            if (isNaN(d)) return "-";
+            return `${d.getDate().toString().padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        }
+
+        /* =====================================================
+           KATEGORI BELANJA — HELPER & CRUD
+        ===================================================== */
+        function getKategoriBelanjaList() {
+            let list = db["Kategori Belanja"] || [];
+            if (list.length === 0) {
+                // Inisialisasi awal dengan kategori default
+                list = [
+                    {nama: "ATK"},
+                    {nama: "Operasional"},
+                    {nama: "Kegiatan Pembelajaran"},
+                    {nama: "Perlengkapan Kelas"}
+                ];
+                db["Kategori Belanja"] = list;
+                saveDB();
+            }
+            return list.map(k => typeof k === 'string' ? {nama: k} : {nama: k.nama});
+        }
+
+        function openKategoriBelanjaModal() {
+            document.getElementById("newKategoriBelanjaName").value = "";
+            renderKategoriBelanjaList();
+            document.getElementById("modalKategoriBelanja").classList.add("show");
+        }
+
+        function closeKategoriBelanjaModal() {
+            document.getElementById("modalKategoriBelanja").classList.remove("show");
+        }
+
+        function renderKategoriBelanjaList() {
+            let kategoris = getKategoriBelanjaList();
+            let rabAdmin = (db["Rencana Anggaran"] || []).filter(x => !x.nama_guru);
+            let container = document.getElementById("kategoriBelanjaListContainer");
+            
+            if (kategoris.length === 0) {
+                container.innerHTML = `<div class="kat-empty">
+                    <i class="fa-solid fa-inbox" style="font-size: 28px; display: block; margin-bottom: 10px; opacity: 0.4;"></i>
+                    Belum ada kategori. Tambahkan kategori baru di atas.
+                </div>`;
+                return;
+            }
+            
+            container.innerHTML = kategoris.map((k, idx) => {
+                let nama = k.nama;
+                let items = rabAdmin.filter(x => x.kategori_belanja === nama);
+                let count = items.length;
+                let totalKat = items.reduce((s, x) => s + (Number(x.total) || 0), 0);
+                return `
+                <div class="kat-row">
+                    <div class="kat-info">
+                        <div class="kat-name">${nama}</div>
+                        <div class="kat-usage">${count} item RAB • ${rupiah(totalKat)}</div>
+                    </div>
+                    <div class="kat-actions">
+                        <button class="btn btn-light btn-sm" onclick="editKategoriBelanja(${idx})" title="Ubah nama">
+                            <i class="fa-solid fa-pen" style="color: var(--primary2);"></i>
+                        </button>
+                        <button class="btn btn-light btn-sm" style="background:#fff5f5; border:1px solid #ffcccc;" onclick="hapusKategoriBelanja(${idx})" title="Hapus">
+                            <i class="fa-solid fa-trash" style="color: var(--danger);"></i>
+                        </button>
+                    </div>
+                </div>`;
+            }).join("");
+        }
+
+        function tambahKategoriBelanja() {
+            let nama = document.getElementById("newKategoriBelanjaName").value.trim();
+            if (!nama) { toast("Masukkan nama kategori!"); return; }
+            
+            let kategoris = getKategoriBelanjaList();
+            if (kategoris.some(k => k.nama.toLowerCase() === nama.toLowerCase())) {
+                toast("Kategori dengan nama ini sudah ada!");
+                return;
+            }
+            
+            if (!db["Kategori Belanja"]) db["Kategori Belanja"] = [];
+            db["Kategori Belanja"].push({nama: nama});
+            saveDB();
+            
+            document.getElementById("newKategoriBelanjaName").value = "";
+            renderKategoriBelanjaList();
+            toast(`Kategori "${nama}" berhasil ditambahkan`);
+        }
+
+        function editKategoriBelanja(idx) {
+            let kategoris = getKategoriBelanjaList();
+            let oldNama = kategoris[idx].nama;
+            
+            Swal.fire({
+                title: 'Ubah Nama Kategori',
+                input: 'text',
+                inputValue: oldNama,
+                inputPlaceholder: 'Nama kategori baru...',
+                showCancelButton: true,
+                confirmButtonText: 'Simpan',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#1d5d9b',
+                inputValidator: (val) => {
+                    if (!val || !val.trim()) return 'Nama tidak boleh kosong';
+                    let v = val.trim();
+                    if (v.toLowerCase() !== oldNama.toLowerCase() && kategoris.some(k => k.nama.toLowerCase() === v.toLowerCase())) {
+                        return 'Nama kategori sudah digunakan';
+                    }
+                }
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    let newNama = res.value.trim();
+                    if (newNama === oldNama) return;
+                    
+                    // Update kategori
+                    db["Kategori Belanja"][idx] = {nama: newNama};
+                    
+                    // Update semua RAB & Pengeluaran yang pakai kategori ini
+                    (db["Rencana Anggaran"] || []).forEach(x => {
+                        if (x.kategori_belanja === oldNama) x.kategori_belanja = newNama;
+                    });
+                    (db["Rencana Pengeluaran"] || []).forEach(x => {
+                        if (x.kategori_belanja === oldNama) x.kategori_belanja = newNama;
+                    });
+                    
+                    saveDB();
+                    renderKategoriBelanjaList();
+                    toast(`Kategori diubah menjadi "${newNama}"`);
+                }
+            });
+        }
+
+        function hapusKategoriBelanja(idx) {
+            let kategoris = getKategoriBelanjaList();
+            let nama = kategoris[idx].nama;
+            
+            // Cek pemakaian
+            let countRAB = (db["Rencana Anggaran"] || []).filter(x => x.kategori_belanja === nama).length;
+            let countPeng = (db["Rencana Pengeluaran"] || []).filter(x => x.kategori_belanja === nama).length;
+            
+            if (countRAB > 0 || countPeng > 0) {
+                let info = [];
+                if (countRAB > 0) info.push(`<b>${countRAB} item RAB</b>`);
+                if (countPeng > 0) info.push(`<b>${countPeng} transaksi pengeluaran</b>`);
+                Swal.fire({
+                    title: 'Tidak Bisa Dihapus',
+                    html: `Kategori <b>"${nama}"</b> masih dipakai oleh ${info.join(" dan ")}.<br><br>Pindahkan atau hapus data tersebut terlebih dahulu.`,
+                    icon: 'warning',
+                    confirmButtonText: 'Mengerti'
+                });
+                return;
+            }
+            
+            Swal.fire({
+                title: 'Hapus Kategori?',
+                html: `Kategori <b>"${nama}"</b> akan dihapus permanen.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonText: 'Batal',
+                confirmButtonText: 'Ya, Hapus'
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    db["Kategori Belanja"].splice(idx, 1);
+                    saveDB();
+                    renderKategoriBelanjaList();
+                    toast(`Kategori "${nama}" dihapus`);
+                }
+            });
+        }
+        /* =====================================================
+           TOGGLE SUMBER DANA COLLAPSIBLE
+        ===================================================== */
+        function toggleSumberDanaCollapse() {
+            let el = document.getElementById("sumberDanaCollapse");
+            if (!el) return;
+            el.classList.toggle("open");
+            // Update hint text
+            let hint = el.querySelector(".sdc-header-hint");
+            if (hint) {
+                hint.innerText = el.classList.contains("open") ? "Klik untuk sembunyikan" : "Klik untuk lihat detail";
+            }
+        }
+
+        /* =====================================================
+           TOGGLE COLLAPSE (Generic)
+        ===================================================== */
+        function toggleCollapse(id) {
+            let el = document.getElementById(id);
+            if (!el) return;
+            el.classList.toggle("open");
+            let hint = el.querySelector(".sdc-header-hint");
+            if (hint) {
+                hint.innerText = el.classList.contains("open") 
+                    ? "Klik untuk sembunyikan" 
+                    : "Klik untuk lihat detail";
+            }
+        }
+
+        /* =====================================================
+           DETAIL KATEGORI PENGELUARAN — Popup Side-by-Side
+        ===================================================== */
+        function openDetailKategoriPengeluaran(kategori, evt) {
+            if (evt) evt.stopPropagation();
+
+            // Ambil RAB admin di kategori ini
+            let rabList = getView("Rencana Anggaran").filter(x => 
+                !x.nama_guru && (x.kategori_belanja || "(Tanpa Kategori)") === kategori
+            );
+            // Ambil pengeluaran admin di kategori ini
+            let pengeluaranList = getView("Rencana Pengeluaran").filter(x => 
+                !x._from_guru && (x.kategori_belanja || "(Tanpa Kategori)") === kategori
+            );
+
+            // Merge per item RAB dengan realisasinya (by rencana_id)
+            let items = rabList.map(rab => {
+                let pengs = pengeluaranList.filter(p => p.rencana_id === rab.id);
+                let volTer = pengs.reduce((s, p) => s + (Number(p.volume) || 0), 0);
+                let totalTer = pengs.reduce((s, p) => s + (Number(p.total) || 0), 0);
+                let volRencana = Number(rab.volume) || 0;
+                let totalRencana = Number(rab.total) || 0;
+                return {
+                    uraian: rab.uraian,
+                    volRencana,
+                    hargaSatuan: Number(rab.nilai) || 0,
+                    totalRencana,
+                    volTer,
+                    totalTer,
+                    sisaVol: volRencana - volTer,
+                    sisaTotal: totalRencana - totalTer,
+                    persen: totalRencana > 0 ? Math.round((totalTer / totalRencana) * 100) : 0,
+                    detailPengeluaran: pengs
+                };
+            });
+
+            let totalPlafon = items.reduce((s, x) => s + x.totalRencana, 0);
+            let totalReal = items.reduce((s, x) => s + x.totalTer, 0);
+            let totalSisa = totalPlafon - totalReal;
+            let persenTotal = totalPlafon > 0 ? Math.round((totalReal / totalPlafon) * 100) : 0;
+
+            document.getElementById("detailKatPengTitle").innerHTML = `<i class="fa-solid fa-folder-open" style="margin-right:8px;"></i> Kategori: ${kategori}`;
+            document.getElementById("detailKatPengSubtitle").innerHTML = 
+                `${items.length} item RAB • Plafon: <b>${rupiah(totalPlafon)}</b> • ` +
+                `Terealisasi: <b>${rupiah(totalReal)}</b> (${persenTotal}%) • ` +
+                `Sisa Belum Terealisasi: <b>${rupiah(totalSisa)}</b>`;
+
+            let tbody = "";
+            if (items.length === 0) {
+                tbody = `<tr><td colspan="10" style="text-align:center; padding:30px; color:var(--muted);">
+                    <i class="fa-solid fa-inbox" style="font-size:30px; opacity:0.3; display:block; margin-bottom:8px;"></i>
+                    Belum ada item RAB di kategori ini.
+                </td></tr>`;
+            } else {
+                tbody = items.map((x, i) => {
+                    let barColor = x.persen >= 100 ? '#22c55e' : (x.persen >= 50 ? '#f59e0b' : '#94a3b8');
+                    let statusLabel = x.persen >= 100 ? 'Selesai' : (x.persen > 0 ? 'Sebagian' : 'Belum');
+                    let statusBg = x.persen >= 100 ? '#dcfce7' : (x.persen > 0 ? '#fef3c7' : '#f1f5f9');
+                    let statusFg = x.persen >= 100 ? '#15803d' : (x.persen > 0 ? '#92400e' : '#64748b');
+
+                    return `<tr>
+                        <td style="text-align:center; font-size:12px;">${i+1}</td>
+                        <td><strong style="font-size:13px;">${x.uraian}</strong></td>
+                        
+                        <!-- RENCANA -->
+                        <td style="text-align:center; background:#eff6ff; font-size:12px;">${x.volRencana}</td>
+                        <td style="text-align:right; background:#eff6ff; font-size:12px;">${rupiah(x.hargaSatuan)}</td>
+                        <td style="text-align:right; background:#eff6ff; font-weight:bold; color:#1d4ed8; font-size:12px;">${rupiah(x.totalRencana)}</td>
+                        
+                        <!-- REALISASI -->
+                        <td style="text-align:center; background:#f0fdf4; font-size:12px; font-weight:bold; color:${x.volTer > 0 ? '#15803d' : '#94a3b8'};">${x.volTer}</td>
+                        <td style="text-align:right; background:#f0fdf4; font-weight:bold; color:${x.totalTer > 0 ? '#15803d' : '#94a3b8'}; font-size:12px;">${rupiah(x.totalTer)}</td>
+                        
+                        <!-- SISA -->
+                        <td style="text-align:center; background:#fffbeb; font-size:12px; color:${x.sisaVol > 0 ? '#d97706' : '#94a3b8'};">${x.sisaVol}</td>
+                        <td style="text-align:right; background:#fffbeb; font-weight:bold; color:${x.sisaTotal > 0 ? '#d97706' : '#94a3b8'}; font-size:12px;">${rupiah(x.sisaTotal)}</td>
+                        
+                        <!-- PROGRESS -->
+                        <td style="text-align:center; min-width:90px;">
+                            <div style="font-size:11px; font-weight:bold; color:${barColor}; margin-bottom:3px;">${x.persen}%</div>
+                            <div style="height:6px; background:#eef2f6; border-radius:3px; overflow:hidden; margin-bottom:3px;">
+                                <div style="height:100%; width:${Math.min(100, x.persen)}%; background:${barColor};"></div>
+                            </div>
+                            <span style="font-size:9px; font-weight:bold; padding:2px 6px; border-radius:8px; background:${statusBg}; color:${statusFg};">${statusLabel}</span>
+                        </td>
+                    </tr>`;
+                }).join("");
+            }
+
+            document.getElementById("detailKatPengContent").innerHTML = `
+                <div class="table-wrapper" style="max-height: 55vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px;">
+                    <table style="font-size:12px;">
+                        <thead>
+                            <tr>
+                                <th rowspan="2" style="text-align:center; width:35px; vertical-align:middle; font-size:11px;">No</th>
+                                <th rowspan="2" style="min-width:170px; vertical-align:middle; font-size:11px;">Uraian</th>
+                                <th colspan="3" style="text-align:center; background:#dbeafe; color:#1e40af; font-size:11px;">
+                                    <i class="fa-solid fa-file-invoice-dollar"></i> RENCANA
+                                </th>
+                                <th colspan="2" style="text-align:center; background:#dcfce7; color:#15803d; font-size:11px;">
+                                    <i class="fa-solid fa-circle-check"></i> TEREALISASI
+                                </th>
+                                <th colspan="2" style="text-align:center; background:#fef3c7; color:#92400e; font-size:11px;">
+                                    <i class="fa-solid fa-hourglass-half"></i> SISA
+                                </th>
+                                <th rowspan="2" style="text-align:center; width:90px; vertical-align:middle; font-size:11px;">Progress</th>
+                            </tr>
+                            <tr>
+                                <th style="text-align:center; background:#eff6ff; font-size:10px;">Vol</th>
+                                <th style="text-align:right; background:#eff6ff; font-size:10px;">Harga</th>
+                                <th style="text-align:right; background:#eff6ff; font-size:10px;">Total</th>
+                                <th style="text-align:center; background:#f0fdf4; font-size:10px;">Vol</th>
+                                <th style="text-align:right; background:#f0fdf4; font-size:10px;">Total</th>
+                                <th style="text-align:center; background:#fffbeb; font-size:10px;">Vol</th>
+                                <th style="text-align:right; background:#fffbeb; font-size:10px;">Nilai</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tbody}</tbody>
+                        ${items.length > 0 ? `
+                        <tfoot>
+                            <tr style="background:#f8fafc; font-weight:bold; border-top:2px solid #000;">
+                                <td colspan="4" style="text-align:right; font-size:12px;">TOTAL KATEGORI</td>
+                                <td style="text-align:right; background:#eff6ff; color:#1d4ed8; font-size:12px;">${rupiah(totalPlafon)}</td>
+                                <td></td>
+                                <td style="text-align:right; background:#f0fdf4; color:#15803d; font-size:12px;">${rupiah(totalReal)}</td>
+                                <td></td>
+                                <td style="text-align:right; background:#fffbeb; color:#d97706; font-size:12px;">${rupiah(totalSisa)}</td>
+                                <td style="text-align:center; font-size:12px;">${persenTotal}%</td>
+                            </tr>
+                        </tfoot>` : ''}
+                    </table>
+                </div>
+
+                <!-- KESIMPULAN -->
+                <div style="margin-top:18px; padding:16px 18px; background:linear-gradient(135deg, #f8fafc, #f1f5f9); border-radius:10px; border:1px solid #e2e8f0;">
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:16px;">
+                        <div style="text-align:center;">
+                            <div style="font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:bold; letter-spacing:0.5px; margin-bottom:4px;">Total Plafon</div>
+                            <div style="font-size:17px; font-weight:bold; color:#1d4ed8;">${rupiah(totalPlafon)}</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:bold; letter-spacing:0.5px; margin-bottom:4px;">Terealisasi</div>
+                            <div style="font-size:17px; font-weight:bold; color:#15803d;">${rupiah(totalReal)}</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:bold; letter-spacing:0.5px; margin-bottom:4px;">Sisa Belum Terealisasi</div>
+                            <div style="font-size:17px; font-weight:bold; color:#d97706;">${rupiah(totalSisa)}</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:bold; letter-spacing:0.5px; margin-bottom:4px;">Persentase</div>
+                            <div style="font-size:17px; font-weight:bold; color:${persenTotal >= 100 ? '#15803d' : persenTotal >= 50 ? '#d97706' : '#94a3b8'};">${persenTotal}%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top:16px; text-align:right;">
+                    <button class="btn btn-light" style="border:1px solid #dce3ea;" onclick="closeDetailKategoriPengeluaran()">Tutup</button>
+                </div>
+            `;
+
+            document.getElementById("modalDetailKategoriPengeluaran").classList.add("show");
+        }
+
+        function closeDetailKategoriPengeluaran() {
+            document.getElementById("modalDetailKategoriPengeluaran").classList.remove("show");
+        }
+
+        function hitungRealisasiPerItem(guru, tahun, uraianRAB) {
+            return getView("Pengajuan")
+                .filter(x => x.nama_guru === guru && x.tahun === tahun && x.approval_status === "Disetujui" &&
+                    (x.uraian_anggaran === uraianRAB || x.uraian === uraianRAB))
+                .reduce((s, x) => s + (Number(x.total) || 0), 0);
+        }
+
+        function hitungTotalRealisasiGuru(guru, tahun) {
+            return getView("Pengajuan")
+                .filter(x => x.nama_guru === guru && x.tahun === tahun && x.approval_status === "Disetujui")
+                .reduce((s, x) => s + (Number(x.total) || 0), 0);
+        }
+
+        /* =====================================================
+           ROUTER
         ===================================================== */
         function openTable(name){
             closeMobileSidebar();
             document.getElementById("topTitle").innerText = name;
-            const data = db[name] || [];
-            
-            let columns = getDefaultFields(name);
 
-            // Hitung Total Ringkasan
-            let summaryHtml = "";
-            if(name === "Rencana Anggaran") {
-                let totalAnggaran = total(data, "total");
-                summaryHtml = `
-                <div style="text-align: right; display: flex; align-items: center;">
-                    <span style="color: var(--muted); margin-right: 5px;">Total Plafon Anggaran:</span> 
-                    <strong style="color: var(--primary); font-size: 16px;">${rupiah(totalAnggaran)}</strong>
-                </div>`;
+            if (name === "Anggaran Kebutuhan Guru") { renderAnggaranKebutuhanGuru(); return; }
+
+            const data = getView(name);
+            let columns = getDefaultFields(name);
+            let totalPend = 0, summaryHtml = "";
+
+            if(name === "Pendapatan") {
+                totalPend = data.reduce((acc, curr) => acc + (Number(curr.jumlah) || 0), 0);
+            } else if(name === "Rencana Anggaran") {
+                let rabAdmin = data.filter(x => !x.nama_guru);
+                let totalAnggaran = total(rabAdmin, "total");
+                summaryHtml = `<div style="text-align: right;"><span style="color: var(--muted); margin-right: 5px;">Total Plafon Anggaran Admin:</span> <strong style="color: var(--primary); font-size: 16px;">${rupiah(totalAnggaran)}</strong></div>`;
             } else if (name === "Rencana Pengeluaran") {
                 let totalPengeluaran = total(data, "total");
-                summaryHtml = `
-                <div style="text-align: right; display: flex; align-items: center;">
-                    <span style="color: var(--muted); margin-right: 5px;">Total Realisasi Pengeluaran:</span> 
-                    <strong style="color: var(--danger); font-size: 16px;">${rupiah(totalPengeluaran)}</strong>
+                summaryHtml = `<div style="text-align: right;"><span style="color: var(--muted); margin-right: 5px;">Total Realisasi Pengeluaran:</span> <strong style="color: var(--danger); font-size: 16px;">${rupiah(totalPengeluaran)}</strong></div>`;
+            }
+
+            if (name === "Pendapatan") {
+                document.getElementById("app").innerHTML = `
+                <div class="page-header">
+                    <div><h1>Data Pendapatan</h1><p>Tahun ${TAHUN_AKTIF || '-'} • Kelola pencatatan pendapatan sekolah per kategori</p></div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <button class="btn btn-light" style="border: 1px solid #dce3ea;" onclick="openKategoriModal()"><i class="fa-solid fa-tags" style="color: var(--primary2);"></i> Kelola Kategori</button>
+                        <button class="btn btn-primary" onclick="openForm('${name}')"><i class="fa-solid fa-plus"></i> Tambah Data</button>
+                    </div>
+                </div>
+                <div class="total-pendapatan-hero">
+                    <div>
+                        <div class="hero-label">TOTAL SELURUH PENDAPATAN — TAHUN ${TAHUN_AKTIF || '-'}</div>
+                        <div class="hero-value">${rupiah(totalPend)}</div>
+                        <div style="font-size: 12px; opacity: 0.85; margin-top: 6px;">${data.length} transaksi • ${getKategoriPendapatanList().length} kategori</div>
+                    </div>
+                    <div class="hero-icon"><i class="fa-solid fa-sack-dollar"></i></div>
+                </div>
+                <div class="kategori-widgets" id="kategoriWidgets">${renderKategoriPendapatanWidgets(data, totalPend)}</div>
+                <div class="box">
+                    <div class="toolbar"><input class="search" placeholder="Cari data pendapatan..." onkeyup="searchTable(this.value,'${name}')"></div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr>${columns.map(c=>`<th style="text-transform:capitalize">${c.replace("_", " ")}</th>`).join("")}<th>Aksi</th></tr></thead>
+                            <tbody id="tableBody">${renderRows(name, data, columns)}</tbody>
+                        </table>
+                    </div>
                 </div>`;
+                return;
+            }
+
+            if (name === "Rencana Pengeluaran") {
+                let allOut = getView("Rencana Pengeluaran");
+                let plafonAnggaran = getView("Rencana Anggaran").filter(x => !x.nama_guru).reduce((s, x) => s + (Number(x.total) || 0), 0);
+                let pengeluaranAdmin = allOut.filter(x => !x._from_guru).reduce((s, x) => s + (Number(x.total) || 0), 0);
+                let sisaSaldo = plafonAnggaran - pengeluaranAdmin;
+                let persenSerapan = plafonAnggaran > 0 ? Math.round((pengeluaranAdmin / plafonAnggaran) * 100) : 0;
+                let jumlahItem = data.length;
+
+                // Group by kategori_belanja untuk realisasi pengeluaran
+                // Group by kategori_belanja — GABUNG dari RAB (plafon) & Pengeluaran (realisasi)
+                let kategoriMap = {};
+                
+                // Plafon per kategori dari RAB admin
+                getView("Rencana Anggaran").filter(x => !x.nama_guru).forEach(x => {
+                    let kat = x.kategori_belanja || "(Tanpa Kategori)";
+                    if (!kategoriMap[kat]) kategoriMap[kat] = { realisasi: 0, count: 0, plafon: 0 };
+                    kategoriMap[kat].plafon += Number(x.total) || 0;
+                });
+                
+                // Realisasi per kategori dari Rencana Pengeluaran admin
+                allOut.filter(x => !x._from_guru).forEach(x => {
+                    let kat = x.kategori_belanja || "(Tanpa Kategori)";
+                    if (!kategoriMap[kat]) kategoriMap[kat] = { realisasi: 0, count: 0, plafon: 0 };
+                    kategoriMap[kat].realisasi += Number(x.total) || 0;
+                    kategoriMap[kat].count += 1;
+                });
+                let kategoriKeys = Object.keys(kategoriMap).sort();
+                let jumlahKategori = kategoriKeys.length;
+
+                document.getElementById("app").innerHTML = `
+                <div class="page-header">
+                    <div><h1>Rencana Pengeluaran</h1><p>Tahun ${TAHUN_AKTIF || '-'} • Kelola pengeluaran internal (admin) sekolah</p></div>
+                    <button class="btn btn-primary" onclick="openForm('Rencana Pengeluaran')"><i class="fa-solid fa-plus"></i> Tambah Data</button>
+                </div>
+
+                <!-- HERO -->
+                <div class="page-hero red">
+                    <div>
+                        <div class="hero-label">Total Plafon Anggaran Admin</div>
+                        <div class="hero-value">${rupiah(plafonAnggaran)}</div>
+                        <div class="hero-sub">${jumlahItem} transaksi pengeluaran • Tahun ${TAHUN_AKTIF}</div>
+                    </div>
+                    <div class="hero-icon"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+                </div>
+
+                <!-- MINI STATS -->
+                <div class="hero-mini-stats">
+                    <div class="hero-mini-card green">
+                        <div class="hmc-label">Plafon Anggaran</div>
+                        <div class="hmc-value">${rupiah(plafonAnggaran)}</div>
+                        <div class="hmc-sub">Alokasi dari Rencana Anggaran</div>
+                    </div>
+                    <div class="hero-mini-card red">
+                        <div class="hmc-label">Realisasi Pengeluaran</div>
+                        <div class="hmc-value">${rupiah(pengeluaranAdmin)}</div>
+                        <div class="hmc-sub">Total yang sudah dibelanjakan</div>
+                    </div>
+                    <div class="hero-mini-card blue">
+                        <div class="hmc-label">Sisa Saldo</div>
+                        <div class="hmc-value">${rupiah(sisaSaldo)}</div>
+                        <div class="hmc-sub">${persenSerapan}% plafon telah terserap</div>
+                    </div>
+                </div>
+
+                <!-- WIDGET PER KATEGORI (COLLAPSIBLE) -->
+                <div class="kategori-belum-collapse expense-style" id="kategoriPengeluaranCollapse">
+                    <div class="sdc-header" onclick="toggleCollapse('kategoriPengeluaranCollapse')">
+                        <div class="sdc-header-left">
+                            <i class="fa-solid fa-folder-open" style="color: #dc3545;"></i>
+                            <span>Realisasi Pengeluaran per Kategori Belanja</span>
+                            <span class="sdc-badge-count">${jumlahKategori} kategori</span>
+                            <i class="fa-solid fa-chevron-down sdc-chevron"></i>
+                        </div>
+                        <div class="sdc-header-hint">Klik untuk lihat detail</div>
+                    </div>
+                    <div class="sdc-body">
+                        <div class="sdc-body-inner">
+                            ${kategoriKeys.length === 0 
+                                ? `<div class="sumber-dana-empty"><i class="fa-solid fa-inbox"></i> Belum ada data pengeluaran per kategori.</div>` 
+                                : kategoriKeys.map(kat => {
+                                    let realisasi = kategoriMap[kat].realisasi;
+                                    let plafon = kategoriMap[kat].plafon;
+                                    let sisa = plafon - realisasi;
+                                    let persen = plafon > 0 ? Math.round((realisasi / plafon) * 100) : 0;
+                                    let barColor = persen >= 100 ? '#22c55e' : (persen >= 80 ? '#f59e0b' : '#3b82f6');
+                                    return `
+                                    <div class="kategori-belum-item" style="cursor:pointer; transition: all 0.15s;" 
+                                         onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,.08)'" 
+                                         onmouseout="this.style.transform=''; this.style.boxShadow=''"
+                                         onclick="openDetailKategoriPengeluaran('${kat.replace(/'/g, "\\'")}', event)">
+                                        <div class="kb-name">${kat}</div>
+                                        <div class="kb-value">${rupiah(realisasi)}</div>
+                                        <div class="kb-count">${kategoriMap[kat].count} transaksi terealisasi</div>
+                                        
+                                        <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #e2e8f0;">
+                                            <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;">
+                                                <span style="color:var(--muted);">Plafon:</span>
+                                                <span style="font-weight:bold;">${rupiah(plafon)}</span>
+                                            </div>
+                                            <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:6px;">
+                                                <span style="color:var(--muted);">Sisa:</span>
+                                                <span style="font-weight:bold; color:${sisa > 0 ? '#d97706' : (sisa < 0 ? '#dc3545' : '#22c55e')};">${rupiah(sisa)}</span>
+                                            </div>
+                                            <div style="height:5px; background:#eef2f6; border-radius:3px; overflow:hidden;">
+                                                <div style="height:100%; width:${Math.min(100, persen)}%; background:${barColor}; border-radius:3px;"></div>
+                                            </div>
+                                            <div style="font-size:10px; color:var(--muted); margin-top:4px; text-align:center; font-weight:bold;">${persen}% terserap • <span style="color:var(--primary2); text-decoration:underline;">Klik untuk detail</span></div>
+                                        </div>
+                                    </div>`;
+                                }).join("")}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="box">
+                    <div class="toolbar"><input class="search" placeholder="Cari data..." onkeyup="searchTable(this.value,'Rencana Pengeluaran')"></div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Nomor</th><th>Tanggal</th><th>Uraian</th><th>Kategori</th><th style="text-align:center;">Volume</th><th style="text-align:right;">Total</th><th>Sumber Dana</th><th style="text-align:center;">Bukti</th><th style="text-align:center;">Status</th><th style="text-align:center;">Aksi</th></tr></thead>
+                            <tbody id="tableBody">${renderRencanaPengeluaranRows(data)}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+                return;
+            }
+
+            if (name === "Rencana Anggaran") {
+                let rabAdmin = data.filter(x => !x.nama_guru);
+                let totalPlafonAdmin = rabAdmin.reduce((s, x) => s + (Number(x.total) || 0), 0);
+                let jumlahItem = rabAdmin.length;
+
+                // Group by kategori_belanja
+                let kategoriMap = {};
+                rabAdmin.forEach(x => {
+                    let kat = x.kategori_belanja || "(Tanpa Kategori)";
+                    if (!kategoriMap[kat]) kategoriMap[kat] = { total: 0, count: 0 };
+                    kategoriMap[kat].total += Number(x.total) || 0;
+                    kategoriMap[kat].count += 1;
+                });
+                let kategoriKeys = Object.keys(kategoriMap).sort();
+                let jumlahKategori = kategoriKeys.length;
+
+                document.getElementById("app").innerHTML=`
+                <div class="page-header">
+                    <div><h1>Rencana Anggaran Admin</h1><p>Tahun ${TAHUN_AKTIF || '-'} • RAB yang dibuat langsung oleh admin (bukan dari guru)</p></div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <button class="btn btn-light" style="border: 1px solid #dce3ea;" onclick="openKategoriBelanjaModal()">
+                            <i class="fa-solid fa-tags" style="color: var(--primary2);"></i> Kelola Kategori
+                        </button>
+                        <button class="btn btn-primary" onclick="openForm('${name}')">
+                            <i class="fa-solid fa-plus"></i> Tambah Data
+                        </button>
+                    </div>
+                </div>                
+
+                <!-- HERO -->
+                <div class="page-hero blue">
+                    <div>
+                        <div class="hero-label">Total Plafon Anggaran Admin</div>
+                        <div class="hero-value">${rupiah(totalPlafonAdmin)}</div>
+                        <div class="hero-sub">${jumlahItem} item rencana • ${jumlahKategori} kategori • Tahun ${TAHUN_AKTIF}</div>
+                    </div>
+                    <div class="hero-icon"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                </div>
+
+                <!-- WIDGET PER KATEGORI (COLLAPSIBLE) -->
+                <div class="kategori-belum-collapse" id="kategoriAnggaranCollapse">
+                    <div class="sdc-header" onclick="toggleCollapse('kategoriAnggaranCollapse')">
+                        <div class="sdc-header-left">
+                            <i class="fa-solid fa-folder-open" style="color: var(--primary2);"></i>
+                            <span>Total Anggaran per Kategori Belanja</span>
+                            <span class="sdc-badge-count">${jumlahKategori} kategori</span>
+                            <i class="fa-solid fa-chevron-down sdc-chevron"></i>
+                        </div>
+                        <div class="sdc-header-hint">Klik untuk lihat detail</div>
+                    </div>
+                    <div class="sdc-body">
+                        <div class="sdc-body-inner">
+                            ${kategoriKeys.length === 0 
+                                ? `<div class="sumber-dana-empty"><i class="fa-solid fa-inbox"></i> Belum ada data kategori belanja.</div>` 
+                                : kategoriKeys.map(kat => `
+                                    <div class="kategori-belum-item">
+                                        <div class="kb-name">${kat}</div>
+                                        <div class="kb-value">${rupiah(kategoriMap[kat].total)}</div>
+                                        <div class="kb-count">${kategoriMap[kat].count} item</div>
+                                    </div>
+                                `).join("")}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="box">
+                    <div class="toolbar"><input class="search" placeholder="Cari data..." onkeyup="searchTable(this.value,'${name}')"></div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr>${columns.map(c=>`<th style="text-transform:capitalize">${c.replace("_", " ")}</th>`).join("")}<th>Aksi</th></tr></thead>
+                            <tbody id="tableBody">${renderRows(name, rabAdmin, columns)}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+                return;
             }
 
             document.getElementById("app").innerHTML=`
             <div class="page-header">
-                <div><h1>Data ${name}</h1><p>Kelola data ${name.toLowerCase()} sekolah</p></div>
+                <div><h1>Data ${name}</h1><p>Tahun ${TAHUN_AKTIF || '-'}</p></div>
                 <button class="btn btn-primary" onclick="openForm('${name}')"><i class="fa-solid fa-plus"></i> Tambah Data</button>
             </div>
-            
             <div class="box">
-                <div class="toolbar" style="align-items: center;">
-                    <input class="search" placeholder="Cari data" onkeyup="searchTable(this.value,'${name}')">
-                    ${summaryHtml}
-                </div>
-                
+                <div class="toolbar"><input class="search" placeholder="Cari data..." onkeyup="searchTable(this.value,'${name}')">${summaryHtml}</div>
                 <div class="table-wrapper">
                     <table>
-                        <thead>
-                            <tr>
-                                ${columns.map(c=>`<th style="text-transform:capitalize">${c.replace("_", " ")}</th>`).join("")}
-                                <th>Aksi</th>
-                            </tr>
-                        </thead>
+                        <thead><tr>${columns.map(c=>`<th style="text-transform:capitalize">${c.replace("_", " ")}</th>`).join("")}<th>Aksi</th></tr></thead>
                         <tbody id="tableBody">${renderRows(name, data, columns)}</tbody>
                     </table>
                 </div>
             </div>`;
         }
 
-        function renderRows(name, data, columns){
-            if(data.length === 0) return `<tr><td colspan="${columns.length+1}" style="text-align:center">Belum ada data ${name.toLowerCase()}</td></tr>`;
-            
-            return data.map(row => `
-                <tr>
-                    ${columns.map(c => {
-                        let value = row[c];
-                        if (c === "nilai" || c === "total") value = rupiah(value);
-                        else if (c === "tanggal") value = formatDate(value);
-                        else if (c === "status") value = `<span class="badge ${value === 'Tunai' ? 'badge-success' : 'badge-warning'}">${value}</span>`;
-                        return `<td>${value ?? "-"}</td>`;
+        /* =====================================================
+           ANGGARAN KEBUTUHAN GURU
+        ===================================================== */
+        function renderAnggaranKebutuhanGuru() {
+            let data = getView("Anggaran Kebutuhan Guru");
+            let dataFiltered = data.filter(x => x.status === "Aktif");
+            let totalPlafonGuru = dataFiltered.reduce((s, x) => s + (Number(x.plafon) || 0), 0);
+
+            // ==== WIDGET PER GURU ====
+            let widgetsHtml = "";
+            if (data.length === 0) {
+                widgetsHtml = `<div class="box" style="text-align:center; padding: 40px; color: var(--muted);">
+                    <i class="fa-solid fa-inbox" style="font-size: 40px; opacity: 0.3; display: block; margin-bottom: 12px;"></i>
+                    Belum ada plafon anggaran guru untuk tahun ${TAHUN_AKTIF || '-'}.
+                </div>`;
+            } else {
+                widgetsHtml = `<div class="guru-rab-grid">
+                    ${data.map(x => {
+                        let rab = getView("Rencana Anggaran").filter(r => r.nama_guru === x.guru && r.tahun === x.tahun);
+                        let totalRAB = rab.reduce((a, r) => a + (Number(r.total) || 0), 0);
+                        let realisasi = hitungTotalRealisasiGuru(x.guru, x.tahun);
+                        let persenSerapan = x.plafon > 0 ? Math.round((totalRAB / x.plafon) * 100) : 0;
+                        let persenRealisasi = x.plafon > 0 ? Math.round((realisasi / x.plafon) * 100) : 0;
+                        let barColor = persenSerapan >= 100 ? '#22c55e' : (persenSerapan >= 80 ? '#f59e0b' : '#3b82f6');
+                        let statusCls = x.status === "Aktif" ? "aktif" : "nonaktif";
+                        return `
+                        <div class="guru-rab-widget ${x.status !== "Aktif" ? 'inactive' : ''}">
+                            <div onclick="openDetailRab('${x.guru.replace(/'/g, "\\'")}', '${x.tahun}')" style="cursor:pointer;">
+                                <div class="grw-header">
+                                    <div class="grw-name">
+                                        <div class="avatar-mini"><i class="fa-solid fa-chalkboard-user"></i></div>
+                                        ${x.guru}
+                                    </div>
+                                    <span class="grw-status ${statusCls}">${x.status}</span>
+                                </div>
+                                <div class="grw-year"><i class="fa-solid fa-calendar"></i> Tahun Anggaran ${x.tahun}</div>
+                                <div class="grw-plafon">
+                                    <div class="label">Jumlah Plafon</div>
+                                    <div class="value">${rupiah(x.plafon)}</div>
+                                </div>
+                                <div class="grw-2col">
+                                    <div class="grw-mini"><div class="label">Dianggarkan</div><div class="value primary">${rupiah(totalRAB)}</div></div>
+                                    <div class="grw-mini"><div class="label">Realisasi</div><div class="value danger">${rupiah(realisasi)}</div></div>
+                                </div>
+                                <div class="grw-progress">
+                                    <div class="labels"><span>Serapan RAB</span><strong>${persenSerapan}%</strong></div>
+                                    <div class="grw-progress-bar"><div class="grw-progress-inner" style="width: ${Math.min(100, persenSerapan)}%; background: ${barColor};"></div></div>
+                                    <div class="labels" style="margin-top:8px;"><span>Realisasi Dana</span><strong style="color: var(--danger);">${persenRealisasi}%</strong></div>
+                                </div>
+                                <div class="grw-hint"><i class="fa-solid fa-hand-pointer"></i> Klik untuk lihat detail RAB</div>
+                            </div>
+                            <!-- ACTION BUTTONS DI DALAM WIDGET -->
+                            <div style="display:flex; gap:6px; margin-top:12px; padding-top:12px; border-top:1px solid #eef2f6; justify-content:center;" onclick="event.stopPropagation();">
+                                <button class="btn btn-light btn-sm" onclick="openDetailRab('${x.guru.replace(/'/g, "\\'")}', '${x.tahun}')" title="Lihat RAB" style="border:1px solid #dce3ea;">
+                                    <i class="fa-solid fa-eye" style="color: var(--info);"></i>
+                                </button>
+                                <button class="btn btn-light btn-sm" onclick="toggleStatusPlafon(${x.id})" title="Toggle Status" style="border:1px solid #dce3ea;">
+                                    <i class="fa-solid fa-toggle-on" style="color: ${x.status === 'Aktif' ? 'var(--success)' : 'var(--muted)'};"></i>
+                                </button>
+                                <button class="btn btn-light btn-sm" onclick="openFormAnggaranGuru(${x.id})" title="Edit Plafon">
+                                    <i class="fa-solid fa-pen" style="color: var(--primary2);"></i>
+                                </button>
+                                <button class="btn btn-light btn-sm" onclick="hapusPlafonGuru(${x.id})" title="Hapus Plafon" style="background:#fff5f5; border:1px solid #ffcccc;">
+                                    <i class="fa-solid fa-trash" style="color: var(--danger);"></i>
+                                </button>
+                            </div>
+                        </div>`;
                     }).join("")}
-                    <td>
-                        <button class="btn btn-light btn-sm" onclick="openForm('${name}',${row.id})" title="Edit Data"><i class="fa-solid fa-pen" style="color: #1d5d9b;"></i></button>
-                        <button class="btn btn-light btn-sm" onclick="deleteData('${name}',${row.id})" title="Hapus Data" style="background-color: #fff5f5; border: 1px solid #ffcccc;"><i class="fa-solid fa-trash" style="color: #dc3545;"></i></button>
-                    </td>
-                </tr>
-            `).join("");
+                </div>`;
+            }
+
+            // ==== BUILD DATA REALISASI GURU ====
+            guruRealState.data = buildGuruRealisasiData();
+            guruRealState.filtered = guruRealState.data.slice();
+            guruRealState.page = 1;
+
+            document.getElementById("app").innerHTML = `
+            <div class="page-header">
+                <div>
+                    <h1>Anggaran Kebutuhan Guru</h1>
+                    <p>Tahun ${TAHUN_AKTIF || '-'} • Klik widget untuk melihat detail RAB & realisasi.</p>
+                </div>
+                <button class="btn btn-primary" onclick="openFormAnggaranGuru()"><i class="fa-solid fa-plus"></i> Tetapkan Plafon Baru</button>
+            </div>
+
+            <div class="akg-hero">
+                <div>
+                    <div class="akg-hero-label">Total Anggaran Kebutuhan Guru</div>
+                    <div class="akg-hero-value">${rupiah(totalPlafonGuru)}</div>
+                    <div class="akg-hero-sub">${dataFiltered.length} guru aktif • Tahun ${TAHUN_AKTIF || '-'}</div>
+                </div>
+                <div class="akg-hero-icon"><i class="fa-solid fa-user-tie"></i></div>
+            </div>
+
+            ${widgetsHtml}
+
+            <!-- TABEL REALISASI PENGGUNAAN GURU -->
+            <div class="box">
+                <h3 style="margin-bottom: 15px; color: var(--primary); font-size: 15px;">
+                    <i class="fa-solid fa-list-check"></i> Realisasi Penggunaan Anggaran Guru (Disetujui)
+                </h3>
+
+                <div class="filter-bar">
+                    <div class="fb-group">
+                        <label><i class="fa-solid fa-calendar"></i> Dari Tanggal</label>
+                        <input type="date" id="grStart">
+                    </div>
+                    <div class="fb-group">
+                        <label><i class="fa-solid fa-calendar"></i> Sampai Tanggal</label>
+                        <input type="date" id="grEnd">
+                    </div>
+                    <div class="fb-group">
+                        <label>Filter Kolom</label>
+                        <select id="grField">
+                            <option value="">-- Semua Kolom --</option>
+                            <option value="tanggal">Tanggal</option>
+                            <option value="nomor">Nomor</option>
+                            <option value="guru">Nama Guru</option>
+                            <option value="uraian_rab">Uraian RAB</option>
+                            <option value="kegiatan">Kegiatan</option>
+                            <option value="sumber_dana">Sumber Dana</option>
+                        </select>
+                    </div>
+                    <div class="fb-group">
+                        <label>Kata Kunci</label>
+                        <input type="text" id="grValue" placeholder="Cari...">
+                    </div>
+                    <div class="fb-actions">
+                        <button class="btn btn-primary btn-sm" onclick="applyGuruRealFilter()"><i class="fa-solid fa-filter"></i> Terapkan</button>
+                        <button class="btn btn-light btn-sm" onclick="resetGuruRealFilter()">Reset</button>
+                    </div>
+                </div>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 50px; text-align: center;">No</th>
+                                <th>Tanggal</th>
+                                <th>Nomor</th>
+                                <th>Nama Guru</th>
+                                <th>Uraian RAB</th>
+                                <th>Kegiatan / Keterangan</th>
+                                <th style="text-align: center;">Vol</th>
+                                <th style="text-align: right;">Jumlah</th>
+                                <th>Sumber Dana</th>
+                                <th style="text-align: center;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="guruRealTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="pagination-bar">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <div>Baris per halaman:</div>
+                        <select id="grPageSize" onchange="changeGuruRealPageSize(this.value)" style="padding: 5px 8px; border: 1px solid #dce3ea; border-radius: 6px; font-size: 12px;">
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                        <div id="grPageInfo"></div>
+                    </div>
+                    <div class="pg-buttons">
+                        <button onclick="changeGuruRealPage(-1)" id="grPrevBtn"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                        <span id="grPageLabel" style="padding: 0 8px; font-weight: bold;"></span>
+                        <button onclick="changeGuruRealPage(1)" id="grNextBtn">Next <i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>`;
+
+            // Render tabel dengan filter pertama
+            applyGuruRealFilter(true);
         }
 
-        function searchTable(keyword, name){
-            const data = db[name] || [];
-            const filtered = data.filter(row => Object.values(row).join(" ").toLowerCase().includes(keyword.toLowerCase()));
-            const columns = getDefaultFields(name);
-            document.getElementById("tableBody").innerHTML = renderRows(name, filtered, columns);
+        function openDetailRab(guru, tahun) {
+            let rab = getView("Rencana Anggaran").filter(x => x.nama_guru === guru && x.tahun === tahun);
+            let plafonObj = getView("Anggaran Kebutuhan Guru").find(x => x.guru === guru && x.tahun === tahun);
+            let plafon = plafonObj ? Number(plafonObj.plafon) : 0;
+            let totalRAB = rab.reduce((s, x) => s + (Number(x.total) || 0), 0);
+            let totalRealisasi = hitungTotalRealisasiGuru(guru, tahun);
+            let sisaPlafon = plafon - totalRAB;
+            let persenSerapan = plafon > 0 ? Math.round((totalRAB / plafon) * 100) : 0;
+            let persenRealisasi = plafon > 0 ? Math.round((totalRealisasi / plafon) * 100) : 0;
+
+            document.getElementById("detailRabTitle").innerHTML = `<i class="fa-solid fa-file-invoice-dollar" style="margin-right:8px;"></i> RAB ${guru}`;
+            document.getElementById("detailRabSubtitle").innerText = `Tahun Anggaran ${tahun} • ${rab.length} item kebutuhan`;
+
+            document.getElementById("detailRabSummary").innerHTML = `
+                <div class="rab-summary-grid">
+                    <div class="rab-summary-item"><div class="label">Plafon</div><div class="value primary">${rupiah(plafon)}</div></div>
+                    <div class="rab-summary-item"><div class="label">Dianggarkan</div><div class="value warning">${rupiah(totalRAB)}</div></div>
+                    <div class="rab-summary-item"><div class="label">Realisasi</div><div class="value danger">${rupiah(totalRealisasi)}</div></div>
+                    <div class="rab-summary-item"><div class="label">Sisa Plafon</div><div class="value success">${rupiah(sisaPlafon)}</div></div>
+                    <div class="rab-summary-item"><div class="label">Serapan RAB</div><div class="value primary">${persenSerapan}%</div></div>
+                    <div class="rab-summary-item"><div class="label">Realisasi Dana</div><div class="value danger">${persenRealisasi}%</div></div>
+                </div>`;
+
+            if (rab.length === 0) {
+                document.getElementById("detailRabContent").innerHTML = `
+                <div style="text-align:center; padding: 40px; color: var(--muted); background:#f8fafc; border-radius:10px;">
+                    <i class="fa-solid fa-inbox" style="font-size: 36px; opacity: 0.3; display: block; margin-bottom: 10px;"></i>
+                    Guru ini belum menyusun Rencana Anggaran.
+                </div>`;
+            } else {
+                let groups = {};
+                rab.forEach(it => {
+                    let kat = it.kategori_belanja || "(Tanpa Kategori)";
+                    if (!groups[kat]) groups[kat] = [];
+                    groups[kat].push(it);
+                });
+                let kategoriKeys = Object.keys(groups).sort();
+
+                let tableHtml = kategoriKeys.map(kat => {
+                    let itemsKat = groups[kat];
+                    let totalKatRAB = itemsKat.reduce((s, x) => s + (Number(x.total) || 0), 0);
+                    let totalKatReal = itemsKat.reduce((s, x) => s + hitungRealisasiPerItem(guru, tahun, x.uraian), 0);
+                    return `
+                    <div style="margin-bottom: 18px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden;">
+                        <div style="background: #f1f5f9; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <div style="font-weight: bold; color: var(--primary); font-size: 13px;">
+                                <i class="fa-solid fa-folder-open" style="margin-right: 6px; color: var(--primary2);"></i> ${kat}
+                            </div>
+                            <div style="font-size: 11px; color: var(--muted);">
+                                RAB: <b style="color: var(--primary);">${rupiah(totalKatRAB)}</b> • 
+                                Realisasi: <b style="color: var(--danger);">${rupiah(totalKatReal)}</b>
+                            </div>
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px; text-align:center;">No</th>
+                                        <th>Uraian</th>
+                                        <th style="text-align:center;">Vol</th>
+                                        <th style="text-align:right;">Harga Satuan</th>
+                                        <th style="text-align:right;">Total Anggaran</th>
+                                        <th style="text-align:right;">Realisasi Penggunaan</th>
+                                        <th style="text-align:center;">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${itemsKat.map((item, idx) => {
+                                        let realItem = hitungRealisasiPerItem(guru, tahun, item.uraian);
+                                        let persen = item.total > 0 ? Math.round((realItem / item.total) * 100) : 0;
+                                        let color = persen >= 100 ? 'var(--success)' : (persen >= 50 ? 'var(--warning)' : 'var(--muted)');
+                                        return `
+                                        <tr>
+                                            <td style="text-align:center;">${idx+1}</td>
+                                            <td><strong>${item.uraian}</strong></td>
+                                            <td style="text-align:center;">${item.volume}</td>
+                                            <td style="text-align:right;">${rupiah(item.nilai)}</td>
+                                            <td style="text-align:right; font-weight:bold; color:var(--primary);">${rupiah(item.total)}</td>
+                                            <td style="text-align:right; font-weight:bold; color:var(--danger);">${rupiah(realItem)}</td>
+                                            <td style="text-align:center; font-weight:bold; color: ${color};">${persen}%</td>
+                                        </tr>`;
+                                    }).join("")}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>`;
+                }).join("");
+
+                document.getElementById("detailRabContent").innerHTML = tableHtml;
+            }
+
+            document.getElementById("modalDetailRab").classList.add("show");
+        }
+
+        function closeDetailRab() {
+            document.getElementById("modalDetailRab").classList.remove("show");
         }
 
         /* =====================================================
-           TAMPILAN REALISASI ANGGARAN
+           CRUD PLAFON GURU
         ===================================================== */
+        function openFormAnggaranGuru(id = null) {
+            let item = id ? (db["Anggaran Kebutuhan Guru"] || []).find(x => x.id === id) : null;
+            let guruList = getGuruList();
+            let tahunDefault = TAHUN_AKTIF || new Date().getFullYear().toString();
+
+            document.getElementById("modal").classList.add("show");
+            document.getElementById("modalTitle").innerText = id ? "Edit Plafon Anggaran Guru" : "Tetapkan Plafon Anggaran Guru";
+
+            let guruOpts = guruList.map(g => `<option value="${g.nama}" ${item?.guru === g.nama ? 'selected' : ''}>${g.nama}</option>`).join("");
+            let tahunHtml = `<input type="text" id="ag_tahun" value="${item?.tahun || tahunDefault}" readonly style="background:#eef2f6; font-weight:bold;">`;
+
+            document.getElementById("dataForm").innerHTML = `
+                <div class="form-grid">
+                    <div class="form-group full">
+                        <label>Nama Guru</label>
+                        <select id="ag_guru" required><option value="">-- Pilih Guru --</option>${guruOpts}</select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tahun Anggaran (Otomatis)</label>
+                        ${tahunHtml}
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="ag_status" required>
+                            <option value="Aktif" ${item?.status === "Aktif" ? 'selected' : ''}>Aktif</option>
+                            <option value="Nonaktif" ${item?.status === "Nonaktif" ? 'selected' : ''}>Nonaktif</option>
+                        </select>
+                    </div>
+                    <div class="form-group full">
+                        <label>Plafon Anggaran (Rp)</label>
+                        <input type="text" id="ag_plafon" value="${item ? Number(item.plafon).toLocaleString('id-ID') : ''}" oninput="formatRupiahInput(this)" placeholder="Contoh: 10.000.000" required>
+                    </div>
+                    <div class="form-group full">
+                        <label>Keterangan (Opsional)</label>
+                        <textarea id="ag_keterangan">${item?.keterangan || ''}</textarea>
+                    </div>
+                </div>
+                <br>
+                <button type="button" class="btn btn-success" onclick="saveFormAnggaranGuru(${id || "null"})"><i class="fa-solid fa-save"></i> Simpan</button>
+                <button type="button" class="btn btn-light" onclick="closeModal()">Batal</button>`;
+        }
+
+        function saveFormAnggaranGuru(id) {
+            let guru = document.getElementById("ag_guru").value;
+            let tahun = document.getElementById("ag_tahun").value;
+            let status = document.getElementById("ag_status").value;
+            let plafon = Number(document.getElementById("ag_plafon").value.replace(/\./g, '')) || 0;
+            let keterangan = document.getElementById("ag_keterangan").value;
+            if (!guru || !tahun || !plafon) { toast("Lengkapi semua kolom!"); return; }
+            let existing = (db["Anggaran Kebutuhan Guru"] || []).find(x => x.guru === guru && x.tahun === tahun && x.id !== id);
+            if (existing) { Swal.fire('Duplikat!', `Sudah ada plafon untuk <b>${guru}</b> tahun <b>${tahun}</b>.`, 'warning'); return; }
+            if (!db["Anggaran Kebutuhan Guru"]) db["Anggaran Kebutuhan Guru"] = [];
+            if (id) {
+                let idx = db["Anggaran Kebutuhan Guru"].findIndex(x => x.id === id);
+                db["Anggaran Kebutuhan Guru"][idx] = { ...db["Anggaran Kebutuhan Guru"][idx], guru, tahun, status, plafon, keterangan };
+                toast("Plafon diperbarui");
+            } else {
+                db["Anggaran Kebutuhan Guru"].push({ id: Date.now(), guru, tahun, status, plafon, keterangan });
+                toast("Plafon ditetapkan");
+            }
+            saveDB(); closeModal(); renderAnggaranKebutuhanGuru();
+        }
+
+        function toggleStatusPlafon(id) {
+            let idx = (db["Anggaran Kebutuhan Guru"] || []).findIndex(x => x.id === id);
+            if (idx === -1) return;
+            let curr = db["Anggaran Kebutuhan Guru"][idx];
+            let nextStatus = curr.status === "Aktif" ? "Nonaktif" : "Aktif";
+            Swal.fire({
+                title: `${nextStatus === "Aktif" ? "Aktifkan" : "Nonaktifkan"} Plafon?`,
+                html: `Plafon <b>${curr.guru}</b> akan diubah menjadi <b>${nextStatus}</b>.`,
+                icon: 'question', showCancelButton: true, confirmButtonText: 'Ya', cancelButtonText: 'Batal',
+                confirmButtonColor: nextStatus === "Aktif" ? '#198754' : '#dc3545'
+            }).then(res => {
+                if (res.isConfirmed) {
+                    db["Anggaran Kebutuhan Guru"][idx].status = nextStatus;
+                    saveDB(); renderAnggaranKebutuhanGuru();
+                    toast(`Plafon ${curr.guru} ${nextStatus.toLowerCase()}`);
+                }
+            });
+        }
+
+        function hapusPlafonGuru(id) {
+            Swal.fire({
+                title: 'Hapus Plafon?', text: 'Plafon ini akan dihapus.',
+                icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Ya, Hapus', cancelButtonText: 'Batal'
+            }).then(res => {
+                if (res.isConfirmed) {
+                    db["Anggaran Kebutuhan Guru"] = (db["Anggaran Kebutuhan Guru"] || []).filter(x => x.id !== id);
+                    saveDB(); renderAnggaranKebutuhanGuru(); toast("Plafon dihapus");
+                }
+            });
+        }
+
+        /* =====================================================
+           KATEGORI PENDAPATAN
+        ===================================================== */
+        function renderKategoriPendapatanWidgets(dataPendapatan, grandTotal) {
+            let kategoris = getKategoriPendapatanList();
+            return kategoris.map(k => {
+                let items = dataPendapatan.filter(x => x.kategori === k.nama);
+                let totalKat = items.reduce((s, x) => s + (Number(x.jumlah) || 0), 0);
+                let persen = grandTotal > 0 ? Math.min(100, Math.round((totalKat / grandTotal) * 100)) : 0;
+                return `
+                <div class="kategori-widget">
+                    <div class="kw-header"><div class="kw-title">${k.nama}</div><div class="kw-count">${items.length} trx</div></div>
+                    <div class="kw-value">${rupiah(totalKat)}</div>
+                    <div class="kw-bar"><div class="kw-bar-inner" style="width: ${persen}%;"></div></div>
+                    <div style="font-size: 11px; color: var(--muted); margin-top: 6px;">${persen}% dari total</div>
+                </div>`;
+            }).join("");
+        }
+        function openKategoriModal() { document.getElementById("newKategoriName").value = ""; renderKategoriList(); document.getElementById("modalKategori").classList.add("show"); }
+        function closeKategoriModal() { document.getElementById("modalKategori").classList.remove("show"); }
+
+        function renderKategoriList() {
+            let kategoris = getKategoriPendapatanList();
+            let pendapatan = db["Pendapatan"] || [];
+            let container = document.getElementById("kategoriListContainer");
+            if (kategoris.length === 0) { container.innerHTML = `<div class="kat-empty">Belum ada kategori.</div>`; return; }
+            container.innerHTML = kategoris.map((k, idx) => {
+                let count = pendapatan.filter(x => x.kategori === k.nama).length;
+                let totalKat = pendapatan.filter(x => x.kategori === k.nama).reduce((s, x) => s + (Number(x.jumlah) || 0), 0);
+                return `<div class="kat-row">
+                    <div class="kat-info"><div class="kat-name">${k.nama}</div><div class="kat-usage">${count} trx • ${rupiah(totalKat)}</div></div>
+                    <div class="kat-actions">
+                        <button class="btn btn-light btn-sm" onclick="editKategoriPendapatan(${idx})"><i class="fa-solid fa-pen" style="color: var(--primary2);"></i></button>
+                        <button class="btn btn-light btn-sm" style="background:#fff5f5; border:1px solid #ffcccc;" onclick="hapusKategoriPendapatan(${idx})"><i class="fa-solid fa-trash" style="color: var(--danger);"></i></button>
+                    </div>
+                </div>`;
+            }).join("");
+        }
+        function tambahKategoriPendapatan() {
+            let nama = document.getElementById("newKategoriName").value.trim();
+            if (!nama) { toast("Isi nama kategori!"); return; }
+            let kategoris = getKategoriPendapatanList();
+            if (kategoris.some(k => k.nama.toLowerCase() === nama.toLowerCase())) { toast("Kategori sudah ada!"); return; }
+            db["Kategori Pendapatan"].push({nama});
+            saveDB(); document.getElementById("newKategoriName").value = ""; renderKategoriList();
+            toast(`Kategori "${nama}" ditambahkan`);
+        }
+        function editKategoriPendapatan(idx) {
+            let kategoris = getKategoriPendapatanList();
+            let oldNama = kategoris[idx].nama;
+            Swal.fire({
+                title: 'Ubah Nama Kategori', input: 'text', inputValue: oldNama,
+                showCancelButton: true, confirmButtonText: 'Simpan', cancelButtonText: 'Batal', confirmButtonColor: '#1d5d9b',
+                inputValidator: (val) => {
+                    if (!val || !val.trim()) return 'Nama wajib diisi';
+                    let v = val.trim();
+                    if (v.toLowerCase() !== oldNama.toLowerCase() && kategoris.some(k => k.nama.toLowerCase() === v.toLowerCase())) return 'Nama sudah dipakai';
+                }
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    let newNama = res.value.trim();
+                    if (newNama === oldNama) return;
+                    db["Kategori Pendapatan"][idx] = {nama: newNama};
+                    (db["Pendapatan"] || []).forEach(x => { if (x.kategori === oldNama) x.kategori = newNama; });
+                    saveDB(); renderKategoriList();
+                    toast(`Diubah ke "${newNama}"`);
+                }
+            });
+        }
+        function hapusKategoriPendapatan(idx) {
+            let kategoris = getKategoriPendapatanList(); let nama = kategoris[idx].nama;
+            let count = (db["Pendapatan"] || []).filter(x => x.kategori === nama).length;
+            if (count > 0) { Swal.fire('Tidak Bisa Dihapus', `Kategori <b>${nama}</b> masih dipakai ${count} transaksi.`, 'warning'); return; }
+            Swal.fire({ title: 'Hapus Kategori?', html: `Hapus <b>"${nama}"</b>?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Ya', cancelButtonText: 'Batal' }).then(res => {
+                if (res.isConfirmed) {
+                    db["Kategori Pendapatan"].splice(idx, 1);
+                    saveDB(); renderKategoriList();
+                    toast(`Kategori "${nama}" dihapus`);
+                }
+            });
+        }
+
+        /* =====================================================
+           RENDER ROWS
+        ===================================================== */
+        function renderRencanaPengeluaranRows(data) {
+            if (data.length === 0) return `<tr><td colspan="10" style="text-align:center; padding: 20px; color: var(--muted);">Belum ada data tahun ${TAHUN_AKTIF || '-'}</td></tr>`;
+            return data.map(row => {
+                let sumber = row.sumber_dana && row.sumber_dana !== "-" ? `<span class="badge badge-success"><i class="fa-solid fa-wallet"></i> ${row.sumber_dana}</span>` : "-";
+                let stat = row.status === "Tunai" ? `<span class="badge badge-success">Tunai</span>` : `<span class="badge badge-warning">${row.status || '-'}</span>`;
+                let kategori = row.kategori_belanja ? `<span class="badge badge-info">${row.kategori_belanja}</span>` : `<span style="color:var(--muted); font-size:11px;">-</span>`;
+                let buktiCell = row.bukti_bayar 
+                    ? `<button class="btn btn-light btn-sm" onclick="lihatBukti(${row.id})" style="border: 1px solid #dce3ea;"><i class="fa-solid ${row.bukti_bayar.startsWith('data:application/pdf') ? 'fa-file-pdf' : 'fa-image'}" style="color: var(--primary2);"></i></button>` 
+                    : `<span style="color:var(--muted); font-size:11px;">-</span>`;
+                return `<tr>
+                    <td>${row.nomor || "-"}</td>
+                    <td>${formatDate(row.tanggal)}</td>
+                    <td>${row.uraian || "-"}</td>
+                    <td>${kategori}</td>
+                    <td style="text-align:center;">${row.volume || 1}</td>
+                    <td style="text-align:right; font-weight:bold; color:var(--danger);">${rupiah(row.total)}</td>
+                    <td>${sumber}</td>
+                    <td style="text-align:center;">${buktiCell}</td>
+                    <td style="text-align:center;">${stat}</td>
+                    <td style="text-align:center;">
+                        <button class="btn btn-light btn-sm" onclick="openForm('Rencana Pengeluaran',${row.id})"><i class="fa-solid fa-pen" style="color: #1d5d9b;"></i></button>
+                        <button class="btn btn-light btn-sm" onclick="deleteData('Rencana Pengeluaran',${row.id})" style="background-color: #fff5f5; border: 1px solid #ffcccc;"><i class="fa-solid fa-trash" style="color: #dc3545;"></i></button>
+                    </td>
+                </tr>`;
+            }).join("");
+        }
+        function renderRows(name, data, columns){
+            if(data.length === 0) return `<tr><td colspan="${columns.length+1}" style="text-align:center; padding: 20px; color: var(--muted);">Belum ada data tahun ${TAHUN_AKTIF || '-'}</td></tr>`;
+            return data.map(row => `<tr>
+                ${columns.map(c => {
+                    let value = row[c];
+                    if (c === "nilai" || c === "total" || c === "jumlah") value = rupiah(value);
+                    else if (c === "tanggal") value = formatDate(value);
+                    else if (c === "status") value = `<span class="badge ${(value === 'Tunai' || value === 'Aktif') ? 'badge-success' : 'badge-warning'}">${value || '-'}</span>`;
+                    else if (c === "kategori_belanja") value = value ? `<span class="badge badge-info">${value}</span>` : "-";
+                    return `<td>${value ?? "-"}</td>`;
+                }).join("")}
+                <td>
+                    <button class="btn btn-light btn-sm" onclick="openForm('${name}',${row.id})"><i class="fa-solid fa-pen" style="color: #1d5d9b;"></i></button>
+                    <button class="btn btn-light btn-sm" onclick="deleteData('${name}',${row.id})" style="background-color: #fff5f5; border: 1px solid #ffcccc;"><i class="fa-solid fa-trash" style="color: #dc3545;"></i></button>
+                </td>
+            </tr>`).join("");
+        }
+        function searchTable(keyword, name){
+            let data = getView(name);
+            if (name === "Rencana Anggaran") data = data.filter(x => !x.nama_guru);
+            const filtered = data.filter(row => Object.values(row).join(" ").toLowerCase().includes(keyword.toLowerCase()));
+            const columns = getDefaultFields(name);
+            if (name === "Rencana Pengeluaran") document.getElementById("tableBody").innerHTML = renderRencanaPengeluaranRows(filtered);
+            else document.getElementById("tableBody").innerHTML = renderRows(name, filtered, columns);
+        }
+
+        /* =====================================================
+           HALAMAN REALISASI
+        ===================================================== */
+        let realisasiState = { data: [], filtered: [], page: 1, pageSize: 10, startDate: "", endDate: "", filterField: "", filterValue: "" };
+        /* =====================================================
+           STATE & LOGIC: REALISASI PENGGUNAAN ANGGARAN GURU
+        ===================================================== */
+        let guruRealState = {
+            data: [], filtered: [], page: 1, pageSize: 10,
+            startDate: "", endDate: "", filterField: "", filterValue: ""
+        };
+
+        function buildGuruRealisasiData() {
+            // Ambil semua pengajuan guru yang sudah disetujui di tahun aktif
+            let list = getView("Pengajuan").filter(x => x.approval_status === "Disetujui");
+            
+            return list.map(x => ({
+                id: x.id,
+                tanggal: x.tanggal || "",
+                nomor: x.nomor || "-",
+                guru: x.nama_guru || "-",
+                uraian_rab: x.uraian_anggaran || "-",
+                kegiatan: x.kegiatan || "-",
+                volume: Number(x.volume) || 0,
+                jumlah: Number(x.total) || 0,
+                sumber_dana: x.sumber_dana || "-",
+                status: x.approval_status || "Disetujui"
+            })).sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal));
+        }
+
+        function applyGuruRealFilter(keepFilter = false) {
+            if (!keepFilter) {
+                guruRealState.startDate = document.getElementById("grStart")?.value || "";
+                guruRealState.endDate = document.getElementById("grEnd")?.value || "";
+                guruRealState.filterField = document.getElementById("grField")?.value || "";
+                guruRealState.filterValue = (document.getElementById("grValue")?.value || "").trim();
+                guruRealState.page = 1;
+            }
+            let filtered = guruRealState.data.slice();
+            if (guruRealState.startDate) filtered = filtered.filter(x => x.tanggal && x.tanggal >= guruRealState.startDate);
+            if (guruRealState.endDate) filtered = filtered.filter(x => x.tanggal && x.tanggal <= guruRealState.endDate);
+            if (guruRealState.filterValue) {
+                let kw = guruRealState.filterValue.toLowerCase();
+                if (guruRealState.filterField) {
+                    filtered = filtered.filter(x => String(x[guruRealState.filterField] || "").toLowerCase().includes(kw));
+                } else {
+                    filtered = filtered.filter(x => Object.values(x).join(" ").toLowerCase().includes(kw));
+                }
+            }
+            guruRealState.filtered = filtered;
+            renderGuruRealisasiTable();
+        }
+
+        function resetGuruRealFilter() {
+            ["grStart","grEnd","grField","grValue"].forEach(id => {
+                let el = document.getElementById(id);
+                if (el) el.value = "";
+            });
+            guruRealState.startDate = "";
+            guruRealState.endDate = "";
+            guruRealState.filterField = "";
+            guruRealState.filterValue = "";
+            guruRealState.page = 1;
+            guruRealState.filtered = guruRealState.data.slice();
+            renderGuruRealisasiTable();
+        }
+
+        function changeGuruRealPageSize(size) {
+            guruRealState.pageSize = Number(size);
+            guruRealState.page = 1;
+            renderGuruRealisasiTable();
+        }
+
+        function changeGuruRealPage(delta) {
+            let totalPages = Math.ceil(guruRealState.filtered.length / guruRealState.pageSize) || 1;
+            let newPage = guruRealState.page + delta;
+            if (newPage < 1) newPage = 1;
+            if (newPage > totalPages) newPage = totalPages;
+            guruRealState.page = newPage;
+            renderGuruRealisasiTable();
+        }
+
+        function renderGuruRealisasiTable() {
+            let s = guruRealState;
+            let totalData = s.filtered.length;
+            let pageSize = s.pageSize;
+            let totalPages = Math.ceil(totalData / pageSize) || 1;
+            if (s.page > totalPages) s.page = totalPages;
+            let startIdx = (s.page - 1) * pageSize;
+            let endIdx = Math.min(startIdx + pageSize, totalData);
+            let pageData = s.filtered.slice(startIdx, endIdx);
+
+            let tbody = document.getElementById("guruRealTableBody");
+            if (!tbody) return;
+
+            if (pageData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding: 30px; color: var(--muted);">Tidak ada data realisasi penggunaan yang cocok dengan filter.</td></tr>`;
+            } else {
+                tbody.innerHTML = pageData.map((x, i) => `
+                    <tr>
+                        <td style="text-align:center;">${startIdx + i + 1}</td>
+                        <td>${formatDate(x.tanggal)}</td>
+                        <td style="font-family: monospace; font-size: 12px; color: var(--muted);">${x.nomor}</td>
+                        <td><strong>${x.guru}</strong></td>
+                        <td>${x.uraian_rab}</td>
+                        <td>${x.kegiatan}</td>
+                        <td style="text-align:center;">${x.volume}</td>
+                        <td style="text-align:right; font-weight:bold; color:var(--danger);">${rupiah(x.jumlah)}</td>
+                        <td><span class="badge badge-success" style="font-size:10px;">${x.sumber_dana}</span></td>
+                        <td style="text-align:center;"><span class="badge badge-success" style="font-size:10px;"><i class="fa-solid fa-check"></i> ${x.status}</span></td>
+                    </tr>
+                `).join("");
+            }
+
+            let infoEl = document.getElementById("grPageInfo");
+            if (infoEl) infoEl.innerHTML = totalData > 0 
+                ? `Menampilkan <b>${startIdx + 1}-${endIdx}</b> dari <b>${totalData}</b> data` 
+                : `0 data`;
+            let labelEl = document.getElementById("grPageLabel");
+            if (labelEl) labelEl.innerText = `Hal ${s.page} / ${totalPages}`;
+            let prevBtn = document.getElementById("grPrevBtn"); if (prevBtn) prevBtn.disabled = s.page <= 1;
+            let nextBtn = document.getElementById("grNextBtn"); if (nextBtn) nextBtn.disabled = s.page >= totalPages;
+        }
+
         function openBudget(){
             closeMobileSidebar();
             document.getElementById("topTitle").innerText = "Realisasi Anggaran";
 
-            const rencana = db["Rencana Anggaran"] || [];
-            const realisasi = db["Rencana Pengeluaran"] || [];
+            let totalPendapatan = getView("Pendapatan").filter(x => !x.approval_status || x.approval_status === "Disetujui").reduce((s, x) => s + (Number(x.jumlah) || 0), 0);
+            let plafonAdmin = getView("Rencana Anggaran").filter(x => !x.nama_guru).reduce((s, x) => s + (Number(x.total) || 0), 0);
+            let plafonGuru = getView("Anggaran Kebutuhan Guru").filter(x => x.status === "Aktif").reduce((s, x) => s + (Number(x.plafon) || 0), 0);
+            let sisaSaldo = totalPendapatan - plafonAdmin - plafonGuru;
+            let realisasiAdmin = getView("Rencana Pengeluaran").filter(x => !x._from_guru).reduce((s, x) => s + (Number(x.total) || 0), 0);
+            let realisasiGuru = getView("Pengajuan").filter(x => x.approval_status === "Disetujui").reduce((s, x) => s + (Number(x.total) || 0), 0);
+            let sisaAdmin = plafonAdmin - realisasiAdmin;
+            let sisaGuru = plafonGuru - realisasiGuru;
+            let persenAdmin = plafonAdmin > 0 ? Math.round((realisasiAdmin / plafonAdmin) * 100) : 0;
+            let persenGuru = plafonGuru > 0 ? Math.round((realisasiGuru / plafonGuru) * 100) : 0;
 
-            const totalRencana = total(rencana, "total");
-            const totalRealisasi = total(realisasi, "total");
-            const sisa = totalRencana - totalRealisasi;
-            const persentase = totalRencana ? Math.round((totalRealisasi / totalRencana) * 100) : 0;
+            let allPengeluaran = [];
+            getView("Rencana Pengeluaran").filter(x => !x._from_guru).forEach(x => {
+                allPengeluaran.push({ id: x.id, asal: "Admin", tanggal: x.tanggal || "", nomor: x.nomor || "-", keterangan: x.uraian || "-", volume: x.volume || 0, jumlah: Number(x.total) || 0, sumber_dana: x.sumber_dana || "-", status: x.status || "-", bukti_bayar: x.bukti_bayar || "" });
+            });
+            getView("Pengajuan").filter(x => x.approval_status === "Disetujui").forEach(x => {
+                allPengeluaran.push({ id: x.id, asal: "Guru (" + x.nama_guru + ")", tanggal: x.tanggal || "", nomor: x.nomor || "-", keterangan: (x.kegiatan || "") + (x.uraian_anggaran ? " — " + x.uraian_anggaran : ""), volume: x.volume || 0, jumlah: Number(x.total) || 0, sumber_dana: x.sumber_dana || "-", status: "Disetujui", bukti_bayar: "" });
+            });
+            allPengeluaran.sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal));
 
-            document.getElementById("app").innerHTML=`
+            realisasiState.data = allPengeluaran;
+            realisasiState.filtered = allPengeluaran.slice();
+            realisasiState.page = 1;
+
+            document.getElementById("app").innerHTML = `
             <div class="page-header">
-                <div>
-                    <h1>Anggaran vs Realisasi</h1>
-                    <p>Pemantauan serapan dan realisasi anggaran sekolah</p>
+                <div><h1>Realisasi Anggaran</h1><p>Tahun ${TAHUN_AKTIF || '-'} • Perbandingan plafon dan realisasi admin & guru</p></div>
+                <button class="btn btn-primary" onclick="printRekapRealisasi()">
+                    <i class="fa-solid fa-print"></i> Cetak Rekapitulasi
+                </button>
+            </div>
+
+            <div class="stat-top-row">
+                <div class="stat-top-card income">
+                    <div class="stc-icon"><i class="fa-solid fa-sack-dollar"></i></div>
+                    <div><div class="stc-label">Jumlah Pendapatan</div><div class="stc-value">${rupiah(totalPendapatan)}</div></div>
+                </div>
+                <div class="stat-top-card saldo">
+                    <div class="stc-icon"><i class="fa-solid fa-wallet"></i></div>
+                    <div>
+                        <div class="stc-label">Sisa Saldo</div>
+                        <div class="stc-value" style="color: ${sisaSaldo >= 0 ? 'var(--primary)' : 'var(--danger)'};">${rupiah(sisaSaldo)}</div>
+                        <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">Pendapatan − Plafon Admin − Plafon Guru</div>
+                    </div>
                 </div>
             </div>
 
-            <div class="cards">
-                <div class="card">
-                    <div class="card-icon blue"><i class="fa-solid fa-file-invoice-dollar"></i></div>
-                    <div class="card-title">Plafon Anggaran</div>
-                    <div class="card-value">${rupiah(totalRencana)}</div>
+            <div class="realisasi-grid">
+                <div class="widget-plafon admin">
+                    <div class="wp-header">
+                        <div class="wp-icon"><i class="fa-solid fa-building-columns"></i></div>
+                        <div><div class="wp-title">Plafon Anggaran Admin</div><div class="wp-sub">Dana yang dikelola langsung oleh admin</div></div>
+                    </div>
+                    <div class="wp-main-value">${rupiah(plafonAdmin)}</div>
+                    <div class="wp-grid-2">
+                        <div class="wp-item"><div class="wp-label">Realisasi Pengeluaran</div><div class="wp-value danger">${rupiah(realisasiAdmin)}</div></div>
+                        <div class="wp-item"><div class="wp-label">Sisa Anggaran</div><div class="wp-value success">${rupiah(sisaAdmin)}</div></div>
+                    </div>
+                    <div class="wp-item" style="text-align:center; background: transparent; border: none; padding: 0;">
+                        <div class="wp-label">Persentase Serapan</div>
+                        <div class="wp-value warning" style="font-size: 20px;">${persenAdmin}%</div>
+                    </div>
+                    <div class="wp-bar"><div class="wp-bar-inner" style="width: ${Math.min(100, persenAdmin)}%;"></div></div>
+                    <div class="wp-percent-text">${persenAdmin}% dari plafon admin telah terserap</div>
                 </div>
-                <div class="card">
-                    <div class="card-icon red"><i class="fa-solid fa-hand-holding-dollar"></i></div>
-                    <div class="card-title">Realisasi Pengeluaran</div>
-                    <div class="card-value">${rupiah(totalRealisasi)}</div>
-                </div>
-                <div class="card">
-                    <div class="card-icon green"><i class="fa-solid fa-wallet"></i></div>
-                    <div class="card-title">Sisa Anggaran</div>
-                    <div class="card-value">${rupiah(sisa)}</div>
-                </div>
-                <div class="card">
-                    <div class="card-icon orange"><i class="fa-solid fa-chart-pie"></i></div>
-                    <div class="card-title">Persentase Serapan</div>
-                    <div class="card-value">${persentase}%</div>
+
+                <div class="widget-plafon guru">
+                    <div class="wp-header">
+                        <div class="wp-icon"><i class="fa-solid fa-user-tie"></i></div>
+                        <div><div class="wp-title">Plafon Anggaran Kebutuhan Guru</div><div class="wp-sub">Dana khusus untuk pengajuan guru</div></div>
+                    </div>
+                    <div class="wp-main-value">${rupiah(plafonGuru)}</div>
+                    <div class="wp-grid-2">
+                        <div class="wp-item"><div class="wp-label">Realisasi Pengeluaran</div><div class="wp-value danger">${rupiah(realisasiGuru)}</div></div>
+                        <div class="wp-item"><div class="wp-label">Sisa Anggaran</div><div class="wp-value success">${rupiah(sisaGuru)}</div></div>
+                    </div>
+                    <div class="wp-item" style="text-align:center; background: transparent; border: none; padding: 0;">
+                        <div class="wp-label">Persentase Serapan</div>
+                        <div class="wp-value warning" style="font-size: 20px;">${persenGuru}%</div>
+                    </div>
+                    <div class="wp-bar"><div class="wp-bar-inner" style="width: ${Math.min(100, persenGuru)}%;"></div></div>
+                    <div class="wp-percent-text">${persenGuru}% dari plafon guru telah terserap</div>
                 </div>
             </div>
 
             <div class="box">
-                <h3 style="margin-bottom:15px; color: var(--primary);">Detail Pencapaian per Uraian</h3>
-                ${realisasiTable(rencana, realisasi)}
+                <h3 style="margin-bottom: 15px; color: var(--primary);"><i class="fa-solid fa-list"></i> Daftar Semua Pengeluaran — Tahun ${TAHUN_AKTIF || '-'}</h3>
+                
+                <div class="filter-bar">
+                    <div class="fb-group"><label><i class="fa-solid fa-calendar"></i> Dari Tanggal</label><input type="date" id="rkStart"></div>
+                    <div class="fb-group"><label><i class="fa-solid fa-calendar"></i> Sampai Tanggal</label><input type="date" id="rkEnd"></div>
+                    <div class="fb-group">
+                        <label>Filter Kolom</label>
+                        <select id="rkField">
+                            <option value="">-- Semua Kolom --</option>
+                            <option value="tanggal">Tanggal</option>
+                            <option value="nomor">Nomor</option>
+                            <option value="keterangan">Keterangan</option>
+                            <option value="asal">Asal/Sumber</option>
+                            <option value="sumber_dana">Sumber Dana</option>
+                            <option value="status">Status</option>
+                        </select>
+                    </div>
+                    <div class="fb-group"><label>Kata Kunci</label><input type="text" id="rkValue" placeholder="Cari..."></div>
+                    <div class="fb-actions">
+                        <button class="btn btn-primary btn-sm" onclick="applyRealisasiFilter()"><i class="fa-solid fa-filter"></i> Terapkan</button>
+                        <button class="btn btn-light btn-sm" onclick="resetRealisasiFilter()">Reset</button>
+                    </div>
+                </div>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 50px; text-align: center;">No</th>
+                                <th>Tanggal</th>
+                                <th>Nomor</th>
+                                <th>Keterangan</th>
+                                <th>Asal</th>
+                                <th style="text-align: center;">Vol</th>
+                                <th style="text-align: right;">Jumlah</th>
+                                <th>Sumber Dana</th>
+                                <th style="text-align: center;">Bukti</th>
+                                <th style="text-align: center;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="realisasiTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="pagination-bar">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <div>Baris per halaman:</div>
+                        <select id="rkPageSize" onchange="changeRealisasiPageSize(this.value)" style="padding: 5px 8px; border: 1px solid #dce3ea; border-radius: 6px; font-size: 12px;">
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                        <div id="rkPageInfo"></div>
+                    </div>
+                    <div class="pg-buttons">
+                        <button onclick="changeRealisasiPage(-1)" id="rkPrevBtn"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                        <span id="rkPageLabel" style="padding: 0 8px; font-weight: bold;"></span>
+                        <button onclick="changeRealisasiPage(1)" id="rkNextBtn">Next <i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
             </div>
             `;
-        }
 
-        function realisasiTable(rencana, realisasi){
-            if(rencana.length === 0) return `<p style="color: var(--muted); font-size: 13px;">Belum ada Rencana Anggaran yang dibuat</p>`;
-            
-            // Perbaikan: Akumulasi total realisasi per uraian dengan reduce
-            let mergedData = rencana.map(plan => {
-                let realisasiUraian = realisasi.filter(r => r.uraian === plan.uraian);
-                let realisasiValue = realisasiUraian.reduce((sum, r) => sum + (Number(r.total) || 0), 0);
-                return {
-                    uraian: plan.uraian,
-                    anggaran: plan.total,
-                    realisasi: realisasiValue,
-                    sisa: plan.total - realisasiValue
-                };
-            });
-
-            return `
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Uraian Anggaran</th>
-                            <th>Nilai Anggaran</th>
-                            <th>Telah Terealisasi</th>
-                            <th>Sisa Dana</th>
-                            <th>Status Serapan</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${mergedData.map(x => `
-                            <tr>
-                                <td>${x.uraian}</td>
-                                <td>${rupiah(x.anggaran)}</td>
-                                <td style="color: var(--danger); font-weight:bold;">${rupiah(x.realisasi)}</td>
-                                <td style="color: var(--success); font-weight:bold;">${rupiah(x.sisa)}</td>
-                                <td>
-                                    <span style="font-weight: bold; color: ${x.anggaran ? (Math.round(x.realisasi/x.anggaran*100) >= 100 ? 'var(--success)' : 'var(--warning)') : 'var(--muted)'};">
-                                        ${x.anggaran ? Math.round(x.realisasi/x.anggaran*100) : 0}% Terpakai
-                                    </span>
-                                </td>
-                            </tr>
-                        `).join("")}
-                    </tbody>
-                </table>
-            </div>`;
+            applyRealisasiFilter(true);
         }
 
         /* =====================================================
-           FORMATTING & LOGIKA VALIDASI VOLUME
+           CETAK REKAPITULASI REALISASI (PDF)
+        ===================================================== */
+        function buildRekapData() {
+            // Kategori pendapatan (kecuali yang mengandung "saldo awal")
+            let kategoriPendapatanList = (db["Kategori Pendapatan"] || [])
+                .map(k => typeof k === 'string' ? k : k.nama)
+                .filter(k => k && !k.toLowerCase().includes("saldo awal"));
+            
+            // Kategori belanja: GABUNG dari Master Kategori Belanja + Semua RAB (admin + guru)
+            let kategoriSet = new Set();
+            // 1. Dari master Kategori Belanja
+            (db["Kategori Belanja"] || []).forEach(k => {
+                let nama = typeof k === 'string' ? k : k.nama;
+                if (nama) kategoriSet.add(nama);
+            });
+            // 2. Dari semua RAB (admin + guru)
+            (db["Rencana Anggaran"] || []).forEach(x => {
+                if (x.kategori_belanja) kategoriSet.add(x.kategori_belanja);
+            });
+            let kategoriBelanjaList = [...kategoriSet].sort();
+            
+            // Filter data tahun aktif
+            let pendapatanYear = getView("Pendapatan");
+            let pengAdminYear = getView("Rencana Pengeluaran").filter(x => !x._from_guru);
+            let pengGuruYear = getView("Pengajuan").filter(x => x.approval_status === "Disetujui");
+            let rabAdminYear = getView("Rencana Anggaran").filter(x => !x.nama_guru);
+            let plafonGuruList = (db["Anggaran Kebutuhan Guru"] || [])
+                .filter(x => String(x.tahun) === String(TAHUN_AKTIF) && x.status === "Aktif");
+            
+            // Saldo Awal dari pendapatan kategori mengandung "saldo awal"
+            let saldoAwalTotal = pendapatanYear
+                .filter(x => (x.kategori || "").toLowerCase().includes("saldo awal"))
+                .reduce((s, x) => s + (Number(x.jumlah) || 0), 0);
+            
+            // Helper: dapatkan kategori_belanja dari pengajuan (fallback cari di RAB guru)
+            function getKategoriFromPengajuan(p) {
+                if (p.kategori_belanja) return p.kategori_belanja;
+                let rab = (db["Rencana Anggaran"] || []).find(x => x.nama_guru === p.nama_guru && x.uraian === p.uraian_anggaran);
+                return rab ? (rab.kategori_belanja || "(Tanpa Kategori)") : "(Tanpa Kategori)";
+            }
+            
+            // === BARIS ADMIN ===
+            let adminRow = {
+                pengguna: "Admin",
+                anggaran: rabAdminYear.reduce((s, x) => s + (Number(x.total) || 0), 0),
+                saldoAwal: saldoAwalTotal,
+                pendapatan: {},
+                belanja: {}
+            };
+            kategoriPendapatanList.forEach(kat => {
+                adminRow.pendapatan[kat] = pendapatanYear
+                    .filter(x => (x.kategori || "") === kat)
+                    .reduce((s, x) => s + (Number(x.jumlah) || 0), 0);
+            });
+            adminRow.totalPendapatan = Object.values(adminRow.pendapatan).reduce((s, v) => s + v, 0);
+            
+            kategoriBelanjaList.forEach(kat => {
+                adminRow.belanja[kat] = pengAdminYear
+                    .filter(x => (x.kategori_belanja || "(Tanpa Kategori)") === kat)
+                    .reduce((s, x) => s + (Number(x.total) || 0), 0);
+            });
+            adminRow.totalBelanja = Object.values(adminRow.belanja).reduce((s, v) => s + v, 0);
+            adminRow.jumlah = adminRow.totalPendapatan - adminRow.totalBelanja;
+            
+            // === BARIS GURU ===
+            let guruRows = plafonGuruList.map(pg => {
+                let guru = pg.guru;
+                let pengGuru = pengGuruYear.filter(x => x.nama_guru === guru);
+                let row = {
+                    pengguna: guru,
+                    anggaran: Number(pg.plafon) || 0,
+                    saldoAwal: 0,
+                    pendapatan: {},
+                    belanja: {}
+                };
+                kategoriPendapatanList.forEach(kat => { row.pendapatan[kat] = 0; });
+                row.totalPendapatan = 0;
+                
+                kategoriBelanjaList.forEach(kat => {
+                    row.belanja[kat] = pengGuru
+                        .filter(x => getKategoriFromPengajuan(x) === kat)
+                        .reduce((s, x) => s + (Number(x.total) || 0), 0);
+                });
+                row.totalBelanja = Object.values(row.belanja).reduce((s, v) => s + v, 0);
+                row.jumlah = 0 - row.totalBelanja;
+                return row;
+            });
+            
+            // === GRAND TOTAL ===
+            let grandTotal = {
+                anggaran: adminRow.anggaran + guruRows.reduce((s, r) => s + r.anggaran, 0),
+                saldoAwal: adminRow.saldoAwal,
+                pendapatan: {},
+                belanja: {},
+                totalPendapatan: adminRow.totalPendapatan,
+                totalBelanja: adminRow.totalBelanja + guruRows.reduce((s, r) => s + r.totalBelanja, 0)
+            };
+            kategoriPendapatanList.forEach(kat => {
+                grandTotal.pendapatan[kat] = adminRow.pendapatan[kat];
+            });
+            kategoriBelanjaList.forEach(kat => {
+                grandTotal.belanja[kat] = adminRow.belanja[kat] + guruRows.reduce((s, r) => s + (r.belanja[kat] || 0), 0);
+            });
+            grandTotal.jumlah = grandTotal.totalPendapatan - grandTotal.totalBelanja;
+            
+            return {
+                tahun: TAHUN_AKTIF,
+                sekolah: db.profile || { nama: "SD GIM BEKASI", kepala: "Kepala Sekolah", bendahara: "Bendahara" },
+                kategoriPendapatanList,
+                kategoriBelanjaList,
+                rows: [adminRow, ...guruRows],
+                grandTotal,
+                tanggalCetak: new Date()
+            };
+        }
+
+        function generateRekapPrintHtml(data) {
+            let header1 = `
+                <tr>
+                    <th rowspan="2" style="width:35px;">No</th>
+                    <th rowspan="2" style="min-width:130px;">Pengguna</th>
+                    <th rowspan="2" style="min-width:110px;">Anggaran</th>
+                    <th rowspan="2" style="min-width:100px;">Saldo Awal</th>
+                    <th colspan="${data.kategoriPendapatanList.length + 1}" style="background:#dcfce7; color:#166534;">PENDAPATAN</th>
+                    <th colspan="${data.kategoriBelanjaList.length + 1}" style="background:#fee2e2; color:#991b1b;">BELANJA</th>
+                    <th rowspan="2" style="min-width:110px; background:#dbeafe; color:#1e40af;">JUMLAH</th>
+                </tr>
+                <tr>
+                    ${data.kategoriPendapatanList.map(k => `<th style="background:#dcfce7; color:#166534;">${k}</th>`).join("")}
+                    <th style="background:#dcfce7; color:#166534;">Total</th>
+                    ${data.kategoriBelanjaList.map(k => `<th style="background:#fee2e2; color:#991b1b;">${k}</th>`).join("")}
+                    <th style="background:#fee2e2; color:#991b1b;">Total</th>
+                </tr>
+            `;
+            
+            let bodyRows = data.rows.map((row, i) => {
+                let isAdmin = row.pengguna === "Admin";
+                let rowStyle = isAdmin ? 'background:#f8fafc; font-weight:bold;' : '';
+                return `
+                <tr style="${rowStyle}">
+                    <td style="text-align:center;">${i+1}</td>
+                    <td>${row.pengguna}</td>
+                    <td style="text-align:right;">${rupiah(row.anggaran)}</td>
+                    <td style="text-align:right;">${row.saldoAwal ? rupiah(row.saldoAwal) : "-"}</td>
+                    ${data.kategoriPendapatanList.map(k => `<td style="text-align:right;">${row.pendapatan[k] ? rupiah(row.pendapatan[k]) : "-"}</td>`).join("")}
+                    <td style="text-align:right; font-weight:bold;">${row.totalPendapatan ? rupiah(row.totalPendapatan) : "-"}</td>
+                    ${data.kategoriBelanjaList.map(k => `<td style="text-align:right;">${row.belanja[k] ? rupiah(row.belanja[k]) : "-"}</td>`).join("")}
+                    <td style="text-align:right; font-weight:bold;">${row.totalBelanja ? rupiah(row.totalBelanja) : "-"}</td>
+                    <td style="text-align:right; font-weight:bold; color:${row.jumlah >= 0 ? '#15803d' : '#b91c1c'};">${row.jumlah < 0 ? `(${rupiah(Math.abs(row.jumlah))})` : rupiah(row.jumlah)}</td>
+                </tr>`;
+            }).join("");
+            
+            let totalRow = `
+                <tr style="background:#d1d5db; font-weight:bold; border-top:2px solid #000;">
+                    <td colspan="2" style="text-align:right;">JUMLAH</td>
+                    <td style="text-align:right;">${rupiah(data.grandTotal.anggaran)}</td>
+                    <td style="text-align:right;">${data.grandTotal.saldoAwal ? rupiah(data.grandTotal.saldoAwal) : "-"}</td>
+                    ${data.kategoriPendapatanList.map(k => `<td style="text-align:right;">${data.grandTotal.pendapatan[k] ? rupiah(data.grandTotal.pendapatan[k]) : "-"}</td>`).join("")}
+                    <td style="text-align:right;">${rupiah(data.grandTotal.totalPendapatan)}</td>
+                    ${data.kategoriBelanjaList.map(k => `<td style="text-align:right;">${data.grandTotal.belanja[k] ? rupiah(data.grandTotal.belanja[k]) : "-"}</td>`).join("")}
+                    <td style="text-align:right;">${rupiah(data.grandTotal.totalBelanja)}</td>
+                    <td style="text-align:right;">${data.grandTotal.jumlah < 0 ? `(${rupiah(Math.abs(data.grandTotal.jumlah))})` : rupiah(data.grandTotal.jumlah)}</td>
+                </tr>
+            `;
+            
+            let tglIndo = formatTanggalIndo(data.tanggalCetak.toISOString().split('T')[0]);
+            
+            return `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Rekapitulasi Realisasi ${data.tahun}</title>
+    <style>
+                @page { size: A3 landscape; margin: 10mm; }
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; font-size: 9pt; margin: 0; padding: 15px; color: #000; }
+        .header { text-align: center; margin-bottom: 15px; }
+        .header h2 { margin: 0 0 4px 0; font-size: 14pt; text-transform: uppercase; }
+        .header h3 { margin: 0 0 4px 0; font-size: 12pt; text-transform: uppercase; }
+        .header p { margin: 0; font-size: 10pt; color: #555; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #333; padding: 4px 6px; font-size: 8pt; }
+        th { text-align: center; font-weight: bold; vertical-align: middle; }
+        td { vertical-align: top; }
+        .footer { margin-top: 25px; display: flex; justify-content: space-between; font-size: 10pt; page-break-inside: avoid; }
+        .ttd-box { text-align: center; width: 220px; }
+        .ttd-space { height: 60px; }
+        .ttd-name { font-weight: bold; text-decoration: underline; }
+        .info-print { text-align: right; font-size: 9pt; color: #666; margin-top: 8px; }
+        @media print { body { padding: 0; } .no-print { display: none !important; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>PEMERINTAH KOTA BEKASI</h2>
+        <h3>REKAPITULASI REALISASI PER PENGGUNA</h3>
+        <p><b>${data.sekolah.nama}</b> • Tahun Anggaran ${data.tahun}</p>
+        <p>Dicetak: ${tglIndo}</p>
+    </div>
+    
+    <table>
+        <thead>${header1}</thead>
+        <tbody>
+            ${bodyRows}
+            ${totalRow}
+        </tbody>
+    </table>
+    
+    <div class="footer">
+        <div class="ttd-box">
+            <p>Mengetahui,</p>
+            <p>KEPALA SEKOLAH</p>
+            <div class="ttd-space"></div>
+            <p class="ttd-name">${data.sekolah.kepala || "........................"}</p>
+        </div>
+        <div class="ttd-box">
+            <p>Kota Bekasi, ${tglIndo}</p>
+            <p>BENDAHARA</p>
+            <div class="ttd-space"></div>
+            <p class="ttd-name">${data.sekolah.bendahara || "........................"}</p>
+        </div>
+    </div>
+    
+    <div class="info-print">Dokumen dibuat oleh SIMKU SD GIM</div>
+    
+    <script>
+        window.onload = function() { setTimeout(function() { window.print(); }, 500); };
+    <\/script>
+</body>
+</html>`;
+        }
+
+                function printRekapRealisasi() {
+            try {
+                if (!TAHUN_AKTIF) {
+                    Swal.fire('Tahun Belum Aktif', 'Aktifkan tahun anggaran terlebih dahulu.', 'warning');
+                    return;
+                }
+                
+                let data = buildRekapData();
+                
+                // Cek ada data atau tidak
+                let adaData = data.rows.some(r => 
+                    r.totalPendapatan > 0 || r.totalBelanja > 0 || r.anggaran > 0
+                );
+                
+                if (!adaData) {
+                    Swal.fire('Tidak Ada Data', 'Belum ada data untuk dicetak pada tahun ini.', 'info');
+                    return;
+                }
+                
+                let html = generateRekapPrintHtml(data);
+                
+                // Coba buka window baru
+                let printWindow = null;
+                try {
+                    printWindow = window.open('', '_blank', 'width=1400,height=900');
+                } catch (e) {
+                    printWindow = null;
+                }
+                
+                if (!printWindow || printWindow.closed || typeof printWindow.closed === 'undefined') {
+                    // Popup diblokir — gunakan fallback iframe
+                    tampilkanFallbackPrint(html);
+                    return;
+                }
+                
+                printWindow.document.open();
+                printWindow.document.write(html);
+                printWindow.document.close();
+                printWindow.focus();
+                
+            } catch (err) {
+                console.error("Print error:", err);
+                Swal.fire({
+                    title: 'Gagal Mencetak',
+                    html: `Terjadi kesalahan saat mencetak laporan.<br><br>
+                           <small style="color:var(--muted); font-size:12px;">Error: ${err.message || 'Unknown'}</small>`,
+                    icon: 'error'
+                });
+            }
+        }
+
+        // Fallback: print lewat iframe tersembunyi (untuk popup yang diblokir)
+        function tampilkanFallbackPrint(html) {
+            Swal.fire({
+                title: 'Cetak Rekapitulasi',
+                html: `
+                    <p style="font-size:13px; color:var(--muted); margin-bottom:12px;">
+                        Popup diblokir browser. Klik tombol di bawah untuk membuka laporan di tab baru.
+                    </p>
+                    <div style="background:#fff8e6; border-left:3px solid #f59e0b; padding:10px 12px; border-radius:6px; text-align:left; font-size:12px; color:#92400e;">
+                        <b>Tips:</b> Saat dialog muncul, izinkan popup untuk website ini agar ke depannya bisa langsung terbuka.
+                    </div>
+                `,
+                icon: 'info',
+                showCancelButton: true,
+                confirmButtonText: '<i class="fa-solid fa-external-link-alt"></i> Buka di Tab Baru',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#1d5d9b'
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    // Buat Blob URL → buka sebagai halaman baru
+                    let blob = new Blob([html], { type: 'text/html' });
+                    let url = URL.createObjectURL(blob);
+                    let newWin = window.open(url, '_blank');
+                    
+                    if (!newWin) {
+                        // Masih diblokir — tampilkan sebagai link download
+                        Swal.fire({
+                            title: 'Popup Masih Diblokir',
+                            html: `
+                                <p style="font-size:13px;">Silakan klik tautan di bawah untuk membuka laporan:</p>
+                                <a href="${url}" target="_blank" style="display:inline-block; padding:10px 20px; background:#1d5d9b; color:white; text-decoration:none; border-radius:8px; margin-top:10px; font-weight:bold;">
+                                    <i class="fa-solid fa-external-link-alt"></i> Buka Laporan Rekapitulasi
+                                </a>
+                            `,
+                            icon: 'warning',
+                            showConfirmButton: false,
+                            showCloseButton: true
+                        });
+                    }
+                    
+                    setTimeout(() => URL.revokeObjectURL(url), 60000);
+                }
+            });
+        }
+
+
+
+        function applyRealisasiFilter(keepFilter = false) {
+            if (!keepFilter) {
+                realisasiState.startDate = document.getElementById("rkStart").value || "";
+                realisasiState.endDate = document.getElementById("rkEnd").value || "";
+                realisasiState.filterField = document.getElementById("rkField").value || "";
+                realisasiState.filterValue = (document.getElementById("rkValue").value || "").trim();
+                realisasiState.page = 1;
+            } else {
+                let elStart = document.getElementById("rkStart"); if (elStart) realisasiState.startDate = elStart.value || "";
+                let elEnd = document.getElementById("rkEnd"); if (elEnd) realisasiState.endDate = elEnd.value || "";
+                let elField = document.getElementById("rkField"); if (elField) realisasiState.filterField = elField.value || "";
+                let elValue = document.getElementById("rkValue"); if (elValue) realisasiState.filterValue = (elValue.value || "").trim();
+            }
+            let filtered = realisasiState.data.slice();
+            if (realisasiState.startDate) filtered = filtered.filter(x => x.tanggal && x.tanggal >= realisasiState.startDate);
+            if (realisasiState.endDate) filtered = filtered.filter(x => x.tanggal && x.tanggal <= realisasiState.endDate);
+            if (realisasiState.filterValue) {
+                let kw = realisasiState.filterValue.toLowerCase();
+                if (realisasiState.filterField) filtered = filtered.filter(x => String(x[realisasiState.filterField] || "").toLowerCase().includes(kw));
+                else filtered = filtered.filter(x => Object.values(x).join(" ").toLowerCase().includes(kw));
+            }
+            realisasiState.filtered = filtered;
+            renderRealisasiTable();
+        }
+
+        function resetRealisasiFilter() {
+            document.getElementById("rkStart").value = ""; document.getElementById("rkEnd").value = "";
+            document.getElementById("rkField").value = ""; document.getElementById("rkValue").value = "";
+            realisasiState.startDate = ""; realisasiState.endDate = ""; realisasiState.filterField = ""; realisasiState.filterValue = "";
+            realisasiState.page = 1; realisasiState.filtered = realisasiState.data.slice();
+            renderRealisasiTable();
+        }
+
+        function changeRealisasiPageSize(size) { realisasiState.pageSize = Number(size); realisasiState.page = 1; renderRealisasiTable(); }
+        function changeRealisasiPage(delta) {
+            let totalPages = Math.ceil(realisasiState.filtered.length / realisasiState.pageSize) || 1;
+            let newPage = realisasiState.page + delta;
+            if (newPage < 1) newPage = 1;
+            if (newPage > totalPages) newPage = totalPages;
+            realisasiState.page = newPage;
+            renderRealisasiTable();
+        }
+
+        function renderRealisasiTable() {
+            let s = realisasiState;
+            let totalData = s.filtered.length;
+            let pageSize = s.pageSize;
+            let totalPages = Math.ceil(totalData / pageSize) || 1;
+            if (s.page > totalPages) s.page = totalPages;
+            let startIdx = (s.page - 1) * pageSize;
+            let endIdx = Math.min(startIdx + pageSize, totalData);
+            let pageData = s.filtered.slice(startIdx, endIdx);
+            let tbody = document.getElementById("realisasiTableBody");
+            if (!tbody) return;
+            if (pageData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding: 30px; color: var(--muted);">Tidak ada data pengeluaran tahun ${TAHUN_AKTIF || '-'} yang cocok dengan filter.</td></tr>`;
+            } else {
+                tbody.innerHTML = pageData.map((x, i) => {
+                    let badgeAsal = x.asal.startsWith("Admin") 
+                        ? `<span class="badge" style="background:#e1efff; color:#0d6efd;"><i class="fa-solid fa-building-columns"></i> Admin</span>` 
+                        : `<span class="badge" style="background:#fff3df; color:#9a6500;"><i class="fa-solid fa-user-tie"></i> ${x.asal.replace("Guru (", "").replace(")", "")}</span>`;
+                    let badgeSumber = x.sumber_dana && x.sumber_dana !== "-" ? `<span class="badge badge-success" style="font-size: 10px;">${x.sumber_dana}</span>` : `<span style="color:var(--muted); font-size:11px;">-</span>`;
+                    let badgeStatus = x.status === "Disetujui" || x.status === "Tunai" ? `<span class="badge badge-success" style="font-size: 10px;">${x.status}</span>` : `<span class="badge badge-warning" style="font-size: 10px;">${x.status}</span>`;
+                    let buktiCell = x.bukti_bayar 
+                        ? `<button class="btn btn-light btn-sm" onclick="lihatBukti(${x.id})" style="border: 1px solid #dce3ea;"><i class="fa-solid ${x.bukti_bayar.startsWith('data:application/pdf') ? 'fa-file-pdf' : 'fa-image'}" style="color: var(--primary2);"></i></button>` 
+                        : `<span style="color:var(--muted); font-size:11px;">-</span>`;
+                    return `<tr>
+                        <td style="text-align:center;">${startIdx + i + 1}</td>
+                        <td>${formatDate(x.tanggal)}</td>
+                        <td style="font-family: monospace; font-size: 12px; color: var(--muted);">${x.nomor}</td>
+                        <td>${x.keterangan}</td>
+                        <td>${badgeAsal}</td>
+                        <td style="text-align:center;">${x.volume}</td>
+                        <td style="text-align:right; font-weight:bold; color: var(--danger);">${rupiah(x.jumlah)}</td>
+                        <td>${badgeSumber}</td>
+                        <td style="text-align:center;">${buktiCell}</td>
+                        <td style="text-align:center;">${badgeStatus}</td>
+                    </tr>`;
+                }).join("");
+            }
+            let infoEl = document.getElementById("rkPageInfo");
+            if (infoEl) infoEl.innerHTML = totalData > 0 ? `Menampilkan <b>${startIdx + 1}-${endIdx}</b> dari <b>${totalData}</b> data` : `0 data`;
+            let labelEl = document.getElementById("rkPageLabel");
+            if (labelEl) labelEl.innerText = `Hal ${s.page} / ${totalPages}`;
+            let prevBtn = document.getElementById("rkPrevBtn"); if (prevBtn) prevBtn.disabled = s.page <= 1;
+            let nextBtn = document.getElementById("rkNextBtn"); if (nextBtn) nextBtn.disabled = s.page >= totalPages;
+        }
+        
+
+        /* =====================================================
+           FORMATTING & VALIDASI
         ===================================================== */
         function formatRupiahInput(elem) {
             let number_string = elem.value.replace(/[^,\d]/g, '').toString();
@@ -254,205 +2148,462 @@
             elem.value = split[1] !== undefined ? rupiah + ',' + split[1] : rupiah;
         }
 
-        // Kalkulasi Rencana Anggaran (Vol x Nilai)
+        function hitungSaldoKategoriDanaLokal(excludeId = null) {
+            let pendapatan = getView("Pendapatan");
+            let pengeluaran = getView("Pengeluaran");
+            let pengajuan = getView("Pengajuan");
+            let rencanaKeluar = getView("Rencana Pengeluaran");
+            let kategoris = getKategoriPendapatanList().map(k => k.nama);
+            let saldoMap = {};
+            kategoris.forEach(k => { saldoMap[k] = 0; });
+            pendapatan.forEach(x => {
+                if (x.approval_status && x.approval_status !== "Disetujui") return;
+                if (!x.kategori) return;
+                if (saldoMap[x.kategori] === undefined) saldoMap[x.kategori] = 0;
+                saldoMap[x.kategori] += Number(x.jumlah) || 0;
+            });
+            pengeluaran.forEach(x => {
+                if (x.approval_status !== "Disetujui") return;
+                if (!x.sumber_dana) return;
+                if (saldoMap[x.sumber_dana] === undefined) saldoMap[x.sumber_dana] = 0;
+                saldoMap[x.sumber_dana] -= Number(x.jumlah) || 0;
+            });
+            pengajuan.forEach(x => {
+                if (x.approval_status !== "Disetujui") return;
+                if (!x.sumber_dana) return;
+                if (saldoMap[x.sumber_dana] === undefined) saldoMap[x.sumber_dana] = 0;
+                saldoMap[x.sumber_dana] -= Number(x.total) || 0;
+            });
+            rencanaKeluar.forEach(x => {
+                if (x._from_guru) return;
+                if (x.approval_status !== "Disetujui") return;
+                if (!x.sumber_dana) return;
+                if (excludeId && x.id === excludeId) return;
+                if (saldoMap[x.sumber_dana] === undefined) saldoMap[x.sumber_dana] = 0;
+                saldoMap[x.sumber_dana] -= Number(x.total) || 0;
+            });
+            return saldoMap;
+        }
+
         function calcAnggaranTotal() {
-            let vol = document.getElementById('anggaran_volume').value.replace(/\./g, '');
-            let nil = document.getElementById('anggaran_nilai').value.replace(/\./g, '');
+            let vol = (document.getElementById('anggaran_volume')?.value || '').replace(/\./g, '');
+            let nil = (document.getElementById('anggaran_nilai')?.value || '').replace(/\./g, '');
             let total = Number(vol) * Number(nil);
             document.getElementById('calc_total').value = total ? total.toLocaleString('id-ID') : '';
         }
 
-        // Handle dropdown uraian diganti
-        function autoFillPengeluaran(sel) {
-            let volInput = document.getElementById('pengeluaran_volume');
-            if(volInput) {
-                volInput.value = ""; // Kosongkan saat pindah pilihan
-            }
-            document.getElementById('pengeluaran_total').value = "";
-        }
-
-        // Kalkulasi & Validasi Rencana Pengeluaran
         function calcPengeluaranTotal() {
             let volInput = document.getElementById('pengeluaran_volume');
-            if(!volInput) return;
-
-            let sel = document.querySelector('select[name="uraian"]');
-            if (!sel || sel.selectedIndex === 0) return;
-            
-            // Ambil data nilai satuan dan sisa batas volume dari option dropdown yang dipilih
-            let maxVol = Number(sel.options[sel.selectedIndex].getAttribute('data-sisa') || 0);
-            let nilaiSatuan = Number(sel.options[sel.selectedIndex].getAttribute('data-nilai') || 0);
-            let val = Number(volInput.value);
-
-            // Validasi Blokade: Tidak boleh melebihi sisa volume
-            if (val > maxVol) {
-                toast("Volume melebihi sisa anggaran! (Sisa Maksimal: " + maxVol + ")");
-                volInput.value = maxVol;
-                val = maxVol;
+            let nilaiInput = document.getElementById('pengeluaran_nilai');
+            let totalInput = document.getElementById('pengeluaran_total');
+            let infoNilai = document.getElementById('info_nilai');
+            if (!volInput || !nilaiInput || !totalInput) return;
+            let vol = Number(volInput.value || 0);
+            let nilai = Number((nilaiInput.value || '').replace(/\./g, '')) || 0;
+            let maxVol = Number(volInput.getAttribute('max') || 0);
+            if (maxVol > 0 && vol > maxVol) { toast(`Volume melebihi sisa rencana (${maxVol})!`); volInput.value = maxVol; vol = maxVol; }
+            let estimasi = Number(nilaiInput.getAttribute('data-estimasi') || 0);
+            if (infoNilai) {
+                if (estimasi > 0 && nilai > estimasi) {
+                    infoNilai.style.color = 'var(--danger)';
+                    infoNilai.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Harga satuan (${rupiah(nilai)}) melebihi estimasi rencana (${rupiah(estimasi)})!`;
+                } else {
+                    infoNilai.style.color = 'var(--muted)';
+                    infoNilai.innerHTML = `Estimasi dari Rencana Anggaran: <b style="color: var(--primary);">${rupiah(estimasi)}</b>. Masukkan harga aktual (tidak boleh melebihi).`;
+                }
             }
+            totalInput.value = (vol * nilai) ? (vol * nilai).toLocaleString('id-ID') : '';
+            validateSaldoSumberDana();
+        }
 
-            let total = val * nilaiSatuan;
-            document.getElementById('pengeluaran_total').value = total ? total.toLocaleString('id-ID') : '';
+        function autoFillPengeluaranAdmin(isEditMode = false) {
+            let sel = document.getElementById('pengeluaran_uraian');
+            if (!sel) return;
+            
+            let kategoriDisplay = document.getElementById('pengeluaran_kategori_display');
+            let sisaDisplay = document.getElementById('pengeluaran_sisa_display');
+            
+            if (!sel.value || sel.selectedIndex <= 0) {
+                // Reset semua
+                ['pengeluaran_nilai','pengeluaran_volume','pengeluaran_total'].forEach(id => {
+                    let el = document.getElementById(id);
+                    if (el) { el.value = ''; el.removeAttribute('max'); el.removeAttribute('data-estimasi'); }
+                });
+                if (kategoriDisplay) kategoriDisplay.innerHTML = '<span style="color: var(--muted); font-weight: normal; font-size: 12px;">— Pilih uraian untuk melihat kategori —</span>';
+                if (sisaDisplay) sisaDisplay.innerText = "";
+                let kategoriHidden = document.getElementById('pengeluaran_kategori');
+                if (kategoriHidden) kategoriHidden.value = "";
+                return;
+            }
+            
+            let opt = sel.options[sel.selectedIndex];
+            let nilai = Number(opt.getAttribute('data-nilai') || 0);
+            let sisa = Number(opt.getAttribute('data-sisa') || 0);
+            let kategori = opt.getAttribute('data-kategori') || '';
+            let namaGuru = opt.getAttribute('data-nama-guru') || '';
+            let tahunAnggaran = opt.getAttribute('data-tahun') || '';
+            let rencanaId = opt.getAttribute('data-rencana-id') || '';
+            let volumeRencana = Number(opt.getAttribute('data-volume-rencana') || 0);
+            
+            let nilaiInput = document.getElementById('pengeluaran_nilai');
+            let volInput = document.getElementById('pengeluaran_volume');
+            let kategoriHidden = document.getElementById('pengeluaran_kategori');
+            let guruHidden = document.getElementById('pengeluaran_nama_guru');
+            let rencanaHidden = document.getElementById('pengeluaran_rencana_id');
+            let sumberSelect = document.getElementById('pengeluaran_sumber_dana');
+            
+            // Auto-fill nilai
+            if (nilaiInput) {
+                nilaiInput.setAttribute('data-estimasi', nilai);
+                nilaiInput.value = nilai ? nilai.toLocaleString('id-ID') : '';
+            }
+            
+            // Set max volume dari sisa
+            if (volInput) { 
+                volInput.setAttribute('max', sisa); 
+                if (!isEditMode) volInput.value = sisa; 
+            }
+            
+            // Set hidden metadata
+            if (kategoriHidden) kategoriHidden.value = kategori;
+            if (guruHidden) guruHidden.value = namaGuru;
+            if (rencanaHidden) rencanaHidden.value = rencanaId;
+            
+            // Tampilkan kategori di kotak info bawah uraian
+            if (kategoriDisplay) {
+                if (kategori) {
+                    kategoriDisplay.innerHTML = `<span style="background: #dbeafe; color: #1e40af; padding: 3px 10px; border-radius: 6px; font-size: 12px;">${kategori}</span>`;
+                } else {
+                    kategoriDisplay.innerHTML = '<span style="color: var(--muted); font-weight: normal; font-size: 12px;">(Tanpa Kategori)</span>';
+                }
+            }
+            
+            // Tampilkan info sisa volume
+            if (sisaDisplay) {
+                sisaDisplay.innerHTML = `Volume rencana: <b>${volumeRencana}</b> • Sisa tersedia: <b style="color: ${sisa > 0 ? 'var(--success)' : 'var(--danger)'};">${sisa}</b>`;
+            }
+            
+            // Auto-select sumber dana dari sumber_dana_map guru (jika dari guru)
+                        // Auto-select sumber dana:
+            // 1. Prioritas: sumber_dana dari RAB admin itu sendiri
+            // 2. Fallback: sumber_dana_map guru (jika RAB berasal dari guru)
+            if (sumberSelect) {
+                let sumberFromRAB = opt.getAttribute('data-sumber') || '';
+                let defaultSumber = '';
+                
+                if (sumberFromRAB) {
+                    defaultSumber = sumberFromRAB;
+                } else if (kategori && namaGuru) {
+                    let statusObj = (db["Status Anggaran Guru"] || []).find(x => x.guru === namaGuru && x.tahun === tahunAnggaran);
+                    let map = statusObj?.sumber_dana_map || {};
+                    defaultSumber = map[kategori] || '';
+                }
+                
+                if (defaultSumber) {
+                    // Cek apakah option dengan value tsb ada
+                    let optExists = Array.from(sumberSelect.options).some(o => o.value === defaultSumber);
+                    if (optExists) {
+                        sumberSelect.value = defaultSumber;
+                        // Trigger validasi saldo setelah auto-select
+                        setTimeout(() => validateSaldoSumberDana(), 10);
+                    }
+                }
+            }
+            
+            calcPengeluaranTotal();
+        }
+
+        function validateSaldoSumberDana() {
+            let sel = document.getElementById('pengeluaran_sumber_dana');
+            let info = document.getElementById('info_saldo');
+            let totalInput = document.getElementById('pengeluaran_total');
+            if (!sel || !info) return;
+            if (!sel.value) { info.style.color = 'var(--muted)'; info.innerHTML = 'Pilih sumber dana.'; return; }
+            let saldo = Number(sel.options[sel.selectedIndex].getAttribute('data-saldo') || 0);
+            let total = Number((totalInput?.value || '').replace(/\./g, '')) || 0;
+            if (total > saldo) {
+                info.style.color = 'var(--danger)';
+                info.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Total (${rupiah(total)}) melebihi saldo <b>${sel.value}</b> (${rupiah(saldo)})!`;
+            } else {
+                info.style.color = 'var(--success)';
+                info.innerHTML = `<i class="fa-solid fa-check-circle"></i> Saldo cukup. Sisa: <b>${rupiah(saldo - total)}</b>`;
+            }
         }
 
         /* =====================================================
-           FORM DINAMIS & DROPDOWN FILTER
+           FORM DINAMIS
         ===================================================== */
         function openForm(name, id=null){
             let item = id ? db[name].find(x => x.id === id) : null;
             document.getElementById("modal").classList.add("show");
             document.getElementById("modalTitle").innerText = id ? `Edit ${name}` : `Tambah ${name}`;
-            
             let fields = getDefaultFields(name);
 
             document.getElementById("dataForm").innerHTML=`
                 <div class="form-grid">
                 ${fields.map(field=>{
-                    let value = item?.[field]??""; let inputHtml = "";
-
-                    // AUTO GEN KODE / NOMOR (PREFIX GIM-)
+                    let value = item?.[field]??""; let inputHtml = "", isFull = false;
                     if (field === "kode" || field === "nomor") {
                         let seq = id ? value : ("GIM-" + Date.now().toString().slice(-4));
                         inputHtml = `<input type="text" name="${field}" value="${seq}" readonly style="background:#eef2f6; font-weight:bold;">`;
                     }
-                    
-                    // ================= RENCANA ANGGARAN =================
-                    else if (field === "uraian" && name === "Rencana Anggaran") { 
-                        inputHtml = `<input type="text" name="${field}" value="${value}" placeholder="Contoh: Pembelian Laptop" required>`; 
-                    }
-                    else if (field === "volume" && name === "Rencana Anggaran") { 
-                        let formattedValue = value ? Number(value).toLocaleString('id-ID') : "";
-                        inputHtml = `<input type="text" id="anggaran_volume" name="${field}" value="${formattedValue}" oninput="formatRupiahInput(this); calcAnggaranTotal()" placeholder="Jumlah barang" required>`; 
-                    }
-                    else if (field === "nilai" && name === "Rencana Anggaran") { 
-                        let formattedValue = value ? Number(value).toLocaleString('id-ID') : "";
-                        inputHtml = `<input type="text" id="anggaran_nilai" name="${field}" value="${formattedValue}" oninput="formatRupiahInput(this); calcAnggaranTotal()" placeholder="Harga satuan" required>`; 
-                    }
-                    else if (field === "total" && name === "Rencana Anggaran") { 
-                        let formattedValue = value ? Number(value).toLocaleString('id-ID') : "";
-                        inputHtml = `<input type="text" id="calc_total" name="${field}" value="${formattedValue}" readonly style="background:#eef2f6" placeholder="Terisi otomatis">`; 
-                    }
-                    else if (field === "sumber_dana") { 
-                        let kats = (db["Kategori Pendapatan"] && db["Kategori Pendapatan"].length > 0) ? db["Kategori Pendapatan"] : [{nama: "Dana BOS"}, {nama: "Sumbangan Pendidikan"}, {nama: "Pendapatan Lain-lain"}];
+                    else if (field === "tanggal") { inputHtml = `<input type="date" name="${field}" value="${value}" required>`; }
+                    else if (field === "kategori" && name === "Pendapatan") {
+                        let kats = getKategoriPendapatanList();
                         let opts = kats.map(k => `<option value="${k.nama}" ${value === k.nama ? "selected" : ""}>${k.nama}</option>`).join("");
-                        inputHtml = `<select name="${field}" required><option value="">-- Pilih Sumber Dana --</option>${opts}</select>`; 
+                        inputHtml = `<select name="${field}" required><option value="">-- Pilih Kategori --</option>${opts}</select>`;
                     }
-                    
-                    // ================= RENCANA PENGELUARAN =================
-                    else if (field === "tanggal") { 
-                        inputHtml = `<input type="date" name="${field}" value="${value}" required>`; 
+                    else if (field === "keterangan") { isFull = true; inputHtml = `<textarea name="${field}" required>${value}</textarea>`; }
+                    else if (field === "jumlah") {
+                        let fv = value ? Number(value).toLocaleString('id-ID') : "";
+                        inputHtml = `<input type="text" name="${field}" value="${fv}" oninput="formatRupiahInput(this)" required>`;
                     }
-                    else if (field === "uraian" && name === "Rencana Pengeluaran") { 
-                        let allAnggaran = db["Rencana Anggaran"] || [];
-                        let allPengeluaran = db["Rencana Pengeluaran"] || [];
-                        let opts = `<option value="">-- Pilih Uraian Tersedia --</option>`;
-                        
+                    else if (field === "status") {
+                        inputHtml = `<select name="${field}" required><option value="Tunai" ${value === "Tunai" ? "selected" : ""}>Tunai</option><option value="Transfer" ${value === "Transfer" ? "selected" : ""}>Transfer</option></select>`;
+                    }
+                    else if (field === "kategori_belanja" && name === "Rencana Anggaran") {
+                        let kats = getKategoriBelanjaList();
+                        let opts = kats.map(k => `<option value="${k.nama}" ${value === k.nama ? "selected" : ""}>${k.nama}</option>`).join("");
+                        inputHtml = `<select name="${field}" required>
+                                        <option value="">-- Pilih Kategori Belanja --</option>
+                                        ${opts}
+                                     </select>
+                                     <small style="color:var(--muted); font-size:11px;">
+                                        Kategori tidak ada? <a href="javascript:void(0)" onclick="closeModal(); openKategoriBelanjaModal();" style="color: var(--primary2); font-weight: bold;">Kelola Kategori</a>
+                                     </small>`;
+                    }
+                    else if (field === "uraian" && name === "Rencana Anggaran") { inputHtml = `<input type="text" name="${field}" value="${value}" required>`; }
+                    else if (field === "volume" && name === "Rencana Anggaran") { let fv = value ? Number(value).toLocaleString('id-ID') : ""; inputHtml = `<input type="text" id="anggaran_volume" name="${field}" value="${fv}" oninput="formatRupiahInput(this); calcAnggaranTotal()" required>`; }
+                    else if (field === "nilai" && name === "Rencana Anggaran") { let fv = value ? Number(value).toLocaleString('id-ID') : ""; inputHtml = `<input type="text" id="anggaran_nilai" name="${field}" value="${fv}" oninput="formatRupiahInput(this); calcAnggaranTotal()" required>`; }
+                    else if (field === "total" && name === "Rencana Anggaran") { let fv = value ? Number(value).toLocaleString('id-ID') : ""; inputHtml = `<input type="text" id="calc_total" name="${field}" value="${fv}" readonly style="background:#eef2f6">`; }
+                    else if (field === "sumber_dana" && name === "Rencana Anggaran") {
+                        let kats = getKategoriPendapatanList();
+                        let opts = kats.map(k => `<option value="${k.nama}" ${value === k.nama ? "selected" : ""}>${k.nama}</option>`).join("");
+                        inputHtml = `<select name="${field}" required><option value="">-- Pilih Sumber Dana --</option>${opts}</select>`;
+                    }
+                    else if (field === "uraian" && name === "Rencana Pengeluaran") {
+                        let allAnggaran = getView("Rencana Anggaran").filter(a => !a.nama_guru);
+                        let allPengeluaran = getView("Rencana Pengeluaran");
+                        let opts = `<option value="" data-kategori="" data-sisa="0">-- Pilih Uraian --</option>`;
                         allAnggaran.forEach(a => {
-                            // Kalkulasi berapa volume yang sudah terpakai oleh uraian ini (Pengecualian saat mengedit row ini)
-                            let terpakai = allPengeluaran
-                                .filter(p => p.uraian === a.uraian && p.id !== id)
-                                .reduce((acc, curr) => acc + (Number(curr.volume) || 0), 0);
-                            
+                            let terpakai = allPengeluaran.filter(p => p.rencana_id === a.id).filter(p => p.id !== id).reduce((acc, curr) => acc + (Number(curr.volume) || 0), 0);
                             let sisaVol = (Number(a.volume) || 0) - terpakai;
-
-                            // Tampilkan di dropdown jika sisa volume > 0, atau jika uraian ini adalah yang sedang diedit
-                            if (a.uraian === value || sisaVol > 0) {
-                                opts += `<option value="${a.uraian}" data-nilai="${a.nilai}" data-sisa="${sisaVol}" ${value === a.uraian ? "selected" : ""}>${a.uraian} (Sisa Vol:${sisaVol})</option>`;
+                            let isSelected = item && (item.rencana_id === a.id);
+                            if (sisaVol > 0 || isSelected) {
+                                opts += `<option value="${a.uraian}" 
+                                                    data-rencana-id="${a.id}" 
+                                                    data-nama-guru="${a.nama_guru || ''}" 
+                                                    data-kategori="${a.kategori_belanja || ''}" 
+                                                    data-nilai="${a.nilai || 0}" 
+                                                    data-sisa="${sisaVol}" 
+                                                    data-tahun="${a.tahun || ''}"
+                                                    data-volume-rencana="${a.volume || 0}"
+                                                    data-sumber="${a.sumber_dana || ''}"
+                                                    ${isSelected ? "selected" : ""}>${a.uraian}</option>`;
                             }
                         });
-                        inputHtml = `<select name="${field}" onchange="autoFillPengeluaran(this)" required>${opts}</select>`;
-                    }
-                    else if (field === "volume" && name === "Rencana Pengeluaran") { 
-                        inputHtml = `<input type="number" id="pengeluaran_volume" name="${field}" value="${value}" oninput="calcPengeluaranTotal()" placeholder="Ketik volume pemakaian" min="1" required>`; 
-                    }
-                    else if (field === "status") { 
+                        
+                        // Set nilai kategori awal (kalau edit)
+                        let initKategori = item?.kategori_belanja || "";
+                        
                         inputHtml = `
-                        <select name="${field}" required>
-                            <option value="Tunai" ${value === "Tunai" ? "selected" : ""}>Tunai</option>
-                            <option value="Transfer" ${value === "Transfer" ? "selected" : ""}>Transfer</option>
-                        </select>`; 
+                            <select name="${field}" id="pengeluaran_uraian" onchange="autoFillPengeluaranAdmin()" required>${opts}</select>
+                            
+                            <input type="hidden" name="rencana_id" id="pengeluaran_rencana_id" value="${item?.rencana_id || ''}">
+                            <input type="hidden" name="nama_guru" id="pengeluaran_nama_guru" value="${item?.nama_guru || ''}">
+                            <input type="hidden" name="kategori_belanja" id="pengeluaran_kategori" value="${initKategori}">
+                            
+                            <div style="margin-top: 8px; padding: 10px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 6px;">
+                                <div style="font-size: 11px; color: #1e40af; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                                    <i class="fa-solid fa-tag"></i> Kategori Belanja
+                                </div>
+                                <div id="pengeluaran_kategori_display" style="font-size: 14px; font-weight: bold; color: var(--primary);">
+                                    ${initKategori || '<span style="color: var(--muted); font-weight: normal; font-size: 12px;">— Pilih uraian untuk melihat kategori —</span>'}
+                                </div>
+                                <div id="pengeluaran_sisa_display" style="font-size: 11px; color: var(--muted); margin-top: 4px;"></div>
+                            </div>
+                        `;
                     }
-                    else if (field === "total" && name === "Rencana Pengeluaran") { 
-                        let formattedValue = value ? Number(value).toLocaleString('id-ID') : "";
-                        inputHtml = `<input type="text" id="pengeluaran_total" name="${field}" value="${formattedValue}" readonly style="background:#eef2f6" placeholder="Terisi tomatis">`; 
+                    else if (field === "volume" && name === "Rencana Pengeluaran") { inputHtml = `<input type="number" id="pengeluaran_volume" name="${field}" value="${value}" oninput="calcPengeluaranTotal()" min="1" required>`; }
+                    else if (field === "nilai" && name === "Rencana Pengeluaran") { 
+                        let fv = value ? Number(value).toLocaleString('id-ID') : ""; 
+                        inputHtml = `<input type="text" id="pengeluaran_nilai" name="${field}" value="${fv}" oninput="formatRupiahInput(this); calcPengeluaranTotal()" required>
+                                     <small id="info_nilai" style="font-size:11px; color:var(--muted);">Masukkan harga satuan aktual (tidak boleh melebihi estimasi)</small>`; 
                     }
-
-                    return `<div class="form-group"><label style="text-transform:capitalize">${field.replace("_", " ")}</label>${inputHtml}</div>`;
+                    else if (field === "total" && name === "Rencana Pengeluaran") { let fv = value ? Number(value).toLocaleString('id-ID') : ""; inputHtml = `<input type="text" id="pengeluaran_total" name="${field}" value="${fv}" readonly style="background:#eef2f6; font-weight:bold;">`; }
+                    else if (field === "sumber_dana" && name === "Rencana Pengeluaran") {
+                        let saldoMap = hitungSaldoKategoriDanaLokal(id);
+                        if (id) { let old = db[name].find(x => x.id === id); if (old && old.sumber_dana && saldoMap[old.sumber_dana] !== undefined) saldoMap[old.sumber_dana] += Number(old.total) || 0; }
+                        let opts = `<option value="">-- Pilih Sumber Dana --</option>`;
+                        Object.keys(saldoMap).sort().forEach(k => {
+                            let saldo = saldoMap[k];
+                            opts += `<option value="${k}" data-saldo="${saldo}" ${value === k ? 'selected' : ''}>${k} — Saldo: ${rupiah(saldo)}${saldo <= 0 ? ' [KOSONG]' : ''}</option>`;
+                        });
+                        inputHtml = `<select name="${field}" id="pengeluaran_sumber_dana" required onchange="validateSaldoSumberDana()">${opts}</select><small id="info_saldo" style="font-size:11px; margin-top:4px; display:block; color:var(--muted);">Pilih sumber dana.</small>`;
+                    }
+                    else { inputHtml = `<input type="text" name="${field}" value="${value}" required>`; }
+                    return `<div class="form-group ${isFull ? 'full' : ''}"><label style="text-transform:capitalize">${field.replace("_", " ")}</label>${inputHtml}</div>`;
                 }).join("")}
+                ${name === "Rencana Pengeluaran" ? `
+                    <div class="form-group full">
+                        <label>Bukti Bayar (Foto/PDF) — Opsional</label>
+                        <input type="file" id="bukti_file" accept="image/*,application/pdf" onchange="handleBuktiUpload(this)" style="padding: 8px; border: 1px dashed #cbd5e1; border-radius: 8px; background: #f8fafc;">
+                        <div id="bukti_preview" style="margin-top:10px;"></div>
+                        <small style="color:var(--muted); font-size:11px;">Maksimal 3MB. Gambar akan dikompres otomatis.</small>
+                    </div>` : ''}
                 </div><br>
                 <button type="button" class="btn btn-success" onclick="saveForm('${name}', ${id || "null"})"><i class="fa-solid fa-save"></i> Simpan</button>
-                <button type="button" class="btn btn-light" onclick="closeModal()">Batal</button>
-            `;
+                <button type="button" class="btn btn-light" onclick="closeModal()">Batal</button>`;
+
+            if (name === "Rencana Pengeluaran") {
+                setTimeout(() => { 
+                    if (item && item.uraian) autoFillPengeluaranAdmin(true);
+                    validateSaldoSumberDana();
+                    if (item && item.bukti_bayar) {
+                        tempBuktiBayar = { data: item.bukti_bayar, nama: item.bukti_bayar_nama || "bukti" };
+                        let type = item.bukti_bayar.startsWith("data:application/pdf") ? "pdf" : "image";
+                        renderBuktiPreview(item.bukti_bayar, item.bukti_bayar_nama || "bukti", type);
+                    } else {
+                        tempBuktiBayar = { data: "", nama: "" };
+                    }
+                }, 50);
+            } else {
+                tempBuktiBayar = { data: "", nama: "" };
+            }
         }
 
-        // PERBARUAN SUSUNAN KOLOM SESUAI INSTRUKSI
         function getDefaultFields(name){
             const map = { 
-                "Rencana Anggaran": ["kode", "uraian", "volume", "nilai", "total", "sumber_dana"], 
-                "Rencana Pengeluaran": ["nomor", "tanggal", "uraian", "volume", "total", "status"]
+                "Pendapatan": ["tanggal", "kategori", "keterangan", "jumlah", "status"],
+                "Rencana Anggaran": ["kode", "kategori_belanja", "uraian", "volume", "nilai", "total", "sumber_dana"], 
+                "Rencana Pengeluaran": ["nomor", "tanggal", "uraian", "volume", "nilai", "total", "sumber_dana", "status"]
             };
             return map[name] || [];
         }
 
         /* =====================================================
-           SIMPAN & HAPUS
+           SIMPAN & HAPUS — AUTO INJECT TAHUN AKTIF
         ===================================================== */
         function saveForm(name, id){
+            if (!checkTahunAktif()) return;
+            
             const form = document.getElementById("dataForm");
-            if(!form.checkValidity()) { toast("Mohon lengkapi semua kolom!"); return; }
-
+            if(!form.checkValidity()) { toast("Lengkapi semua kolom!"); return; }
             const fd = new FormData(form); 
             let obj = {};
-            
             fd.forEach((value, key) => { 
-                // Format angka khusus (Hapus pemisah ribuan)
-                if (key === "volume" || key === "nilai" || key === "total") { 
-                    obj[key] = Number(value.replace(/\./g, '')); 
-                } else {
-                    obj[key] = value;
-                }
+                if (key === "volume" || key === "nilai" || key === "total" || key === "jumlah") obj[key] = Number(value.replace(/\./g, '')); 
+                else if (key === "rencana_id") obj[key] = value ? Number(value) : null;
+                else obj[key] = value;
             });
 
-            if(id){ const index = db[name].findIndex(x => x.id === id); obj.id = id; db[name][index] = obj; toast("Data berhasil diperbarui"); }
-            else{ obj.id = Date.now(); if(!db[name]) db[name] = []; db[name].push(obj); toast("Data berhasil ditambahkan"); }
-            
+            if (name === "Rencana Anggaran") {
+                if (!obj.kategori_belanja || !obj.kategori_belanja.trim()) {
+                    toast("Pilih/isi kategori belanja terlebih dahulu!");
+                    return;
+                }
+                obj.kategori_belanja = obj.kategori_belanja.trim();
+            }
+
+            if (name === "Rencana Pengeluaran") {
+                if (!obj.uraian || !obj.rencana_id) { toast("Pilih uraian!"); return; }
+                if (!obj.sumber_dana) { toast("Pilih sumber dana!"); return; }
+                if (!obj.total || obj.total <= 0) { toast("Total harus > 0!"); return; }
+                let rencana = (db["Rencana Anggaran"] || []).find(x => x.id === obj.rencana_id);
+                if (!rencana) { toast("Rencana tidak ditemukan!"); return; }
+                let estimasiNilai = Number(rencana.nilai) || 0;
+                if (estimasiNilai > 0 && obj.nilai > estimasiNilai) {
+                    Swal.fire({ title: 'Harga Melebihi Estimasi!', html: `Estimasi: <b>${rupiah(estimasiNilai)}</b><br>Harga aktual: <b style="color:var(--danger);">${rupiah(obj.nilai)}</b>`, icon: 'error' });
+                    return;
+                }
+                let terpakai = (db["Rencana Pengeluaran"] || []).filter(p => p.rencana_id === obj.rencana_id && p.id !== id).reduce((s, x) => s + (Number(x.volume) || 0), 0);
+                let sisaVol = (Number(rencana.volume) || 0) - terpakai;
+                if (obj.volume > sisaVol) { Swal.fire('Volume Melebihi!', `Sisa: ${sisaVol}.`, 'error'); return; }
+                let saldoMap = hitungSaldoKategoriDanaLokal(id);
+                if (id) { let old = db[name].find(x => x.id === id); if (old && old.sumber_dana && saldoMap[old.sumber_dana] !== undefined) saldoMap[old.sumber_dana] += Number(old.total) || 0; }
+                if (obj.total > (saldoMap[obj.sumber_dana] || 0)) { Swal.fire('Saldo Tidak Cukup!', `Saldo <b>${obj.sumber_dana}</b>: ${rupiah(saldoMap[obj.sumber_dana] || 0)}`, 'error'); return; }
+                if (tempBuktiBayar.data) {
+                    obj.bukti_bayar = tempBuktiBayar.data;
+                    obj.bukti_bayar_nama = tempBuktiBayar.nama;
+                } else if (id) {
+                    let old = db[name].find(x => x.id === id);
+                    if (old && old.bukti_bayar) { obj.bukti_bayar = old.bukti_bayar; obj.bukti_bayar_nama = old.bukti_bayar_nama; }
+                }
+                obj.approval_status = "Disetujui";
+                obj._from_guru = false;
+                if (!obj.status) obj.status = "Tunai";
+                if (!obj.nomor) obj.nomor = "GIM-" + Date.now().toString().slice(-4);
+            }
+
+            if (["Pendapatan", "Rencana Anggaran", "Rencana Pengeluaran"].includes(name)) {
+                obj.tahun = TAHUN_AKTIF;
+            }
+            // Pendapatan tidak perlu approval — langsung Disetujui
+            if (name === "Pendapatan") {
+                obj.approval_status = "Disetujui";
+            }
+
+            if(id){ 
+                const index = db[name].findIndex(x => x.id === id); obj.id = id; db[name][index] = obj; toast("Data diperbarui"); 
+            } else { 
+                obj.id = Date.now(); if(!db[name]) db[name] = []; db[name].push(obj); toast("Data ditambahkan"); 
+            }
             saveDB(); closeModal(); openTable(name);
         }
 
         function deleteData(name, id){
             Swal.fire({
-                title: 'Hapus Data Anggaran',
-                text: "Jika ini adalah Pengeluaran, volumenya akan dikembalikan ke sisa anggaran",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#dc3545',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: '<i class="fa-solid fa-trash"></i> Ya',
-                cancelButtonText: 'Batal',
-                reverseButtons: true
+                title: `Hapus Data ${name}?`, text: "Data akan dihapus permanen",
+                icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Ya, Hapus', cancelButtonText: 'Batal'
             }).then((result) => {
                 if (result.isConfirmed) {
                     db[name] = db[name].filter(x => x.id !== id);
-                    saveDB(); 
-                    openTable(name); 
-                    Swal.fire({ title: 'Terhapus!', text: 'Data berhasil dihapus', icon: 'success', timer: 1500, showConfirmButton: false });
+                    saveDB(); openTable(name); 
+                    Swal.fire({ title: 'Terhapus!', icon: 'success', timer: 1200, showConfirmButton: false });
                 }
             });
         }
 
-        // BACA REQUEST DARI SIDEBAR DAN BUKA MENU YANG SESUAI
-        const target = sessionStorage.getItem("targetMenu");
-        if(target === "Rencana Pengeluaran") {
-            openTable(target);
-            document.getElementById('budgetMenu').classList.add('open');
-        } else if (target === "Realisasi") {
-            openBudget();
-            document.getElementById('budgetMenu').classList.add('open');
-        } else {
-            openTable("Rencana Anggaran");
-            document.getElementById('budgetMenu').classList.add('open');
+        /* =====================================================
+           INIT — dibungkus IIFE supaya tidak ada top-level return
+        ===================================================== */
+        (function initAnggaranPage() {
+            const target = sessionStorage.getItem("targetMenu");
+
+            if (!TAHUN_AKTIF) {
+                document.getElementById("app").innerHTML = `
+                <div class="page-header">
+                    <div><h1>Tahun Anggaran Belum Aktif</h1><p>Sistem membutuhkan tahun anggaran aktif untuk menampilkan data</p></div>
+                    <button class="btn btn-primary" onclick="goToMasterTahun()"><i class="fa-solid fa-gear"></i> Buka Master Data</button>
+                </div>
+                <div class="box" style="text-align:center; padding: 50px;">
+                    <i class="fa-solid fa-calendar-xmark" style="font-size: 64px; color: var(--warning); display: block; margin-bottom: 20px;"></i>
+                    <h2 style="color: var(--primary); margin-bottom: 12px;">Tidak Ada Tahun Anggaran Aktif</h2>
+                    <p style="color: var(--muted); max-width: 500px; margin: 0 auto 20px;">
+                        Silakan aktifkan salah satu tahun anggaran di menu <b>Master Data → Tahun Anggaran</b> terlebih dahulu.<br>
+                        Setelah diaktifkan, semua data anggaran (admin & guru) akan otomatis menampilkan tahun tersebut.
+                    </p>
+                    <button class="btn btn-primary" onclick="goToMasterTahun()">
+                        <i class="fa-solid fa-arrow-right"></i> Buka Pengaturan Tahun Anggaran
+                    </button>
+                </div>`;
+                sessionStorage.removeItem("targetMenu");
+                return;
+            }
+
+            if (target === "Rencana Pengeluaran") { openTable(target); document.getElementById('budgetMenu')?.classList.add('open'); }
+            else if (target === "Realisasi") { openBudget(); document.getElementById('budgetMenu')?.classList.add('open'); }
+            else if (target === "Rencana Anggaran") { openTable("Rencana Anggaran"); document.getElementById('budgetMenu')?.classList.add('open'); }
+            else if (target === "Anggaran Kebutuhan Guru") { openTable("Anggaran Kebutuhan Guru"); document.getElementById('budgetMenu')?.classList.add('open'); }
+            else { openTable("Pendapatan"); document.getElementById('budgetMenu')?.classList.add('open'); }
+            sessionStorage.removeItem("targetMenu"); 
+        })();
+
+        // Helper navigasi ke master.html → Tahun Anggaran
+        function goToMasterTahun() {
+            sessionStorage.setItem("targetMenu", "Tahun Anggaran");
+            window.location.href = "master.html";
         }
-        sessionStorage.removeItem("targetMenu"); 
     </script>
 </body>
 </html>

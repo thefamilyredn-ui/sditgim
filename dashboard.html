@@ -9,12 +9,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <!-- ================= SIDEBAR UNIVERSAL ================= -->
-    <aside class="sidebar" id="sidebar">
+    <aside class="sidebar" id="sidebar"></aside>
 
-    </aside>
-
-    <!-- MAIN KONTEN -->
     <main class="main">
         <header class="topbar">
             <div class="topbar-left">
@@ -41,112 +37,465 @@
         document.getElementById("userDisplayName").innerText = user.nama;
         document.getElementById("userDisplayRole").innerText = user.role.toUpperCase();
 
+        /* =====================================================
+           YEAR FILTER
+        ===================================================== */
+        const TAHUN_AKTIF = (db["Tahun Anggaran"] || []).find(x => x.status === "Aktif")?.tahun || null;
+
+        function getItemYear(item) {
+            if (!item) return "";
+            if (item.tahun) return String(item.tahun);
+            if (item.tanggal) return String(item.tanggal).substring(0, 4);
+            return "";
+        }
+        function filterByYear(arr) {
+            if (!Array.isArray(arr)) return [];
+            if (!TAHUN_AKTIF) return [];
+            return arr.filter(x => getItemYear(x) === TAHUN_AKTIF);
+        }
+
+        /* =====================================================
+           INIT ROUTER
+        ===================================================== */
         if (user.role === "guru") {
-            document.getElementById("adminMenu").style.display = "none";
+            document.getElementById("adminMenu") && (document.getElementById("adminMenu").style.display = "none");
             renderGuruDashboard();
         } else {
             renderAdminDashboard();
         }
 
+        /* =====================================================
+           ADMIN DASHBOARD
+        ===================================================== */
         function renderAdminDashboard() {
-            const income = total(db["Pendapatan"]);
-            const expense = total(db["Pengeluaran"]);
-            const balance = income - expense;
-            const waiting = [...db["Pendapatan"], ...db["Pengeluaran"]].filter(x => x.status === "Menunggu").length;
+            if (!TAHUN_AKTIF) {
+                document.getElementById("app").innerHTML = `
+                <div class="page-header">
+                    <div><h1>Dashboard Keuangan Sekolah</h1><p>Sistem membutuhkan tahun anggaran aktif</p></div>
+                </div>
+                <div class="box" style="text-align:center; padding: 50px;">
+                    <i class="fa-solid fa-calendar-xmark" style="font-size: 64px; color: var(--warning); display: block; margin-bottom: 20px;"></i>
+                    <h2 style="color: var(--primary); margin-bottom: 12px;">Tidak Ada Tahun Anggaran Aktif</h2>
+                    <p style="color: var(--muted); max-width: 500px; margin: 0 auto 20px;">
+                        Silakan aktifkan salah satu tahun anggaran di menu <b>Master Data → Tahun Anggaran</b> terlebih dahulu.
+                    </p>
+                    <button class="btn btn-primary" onclick="window.location.href='master.html'; sessionStorage.setItem('targetMenu','Tahun Anggaran');">
+                        <i class="fa-solid fa-arrow-right"></i> Buka Pengaturan Tahun Anggaran
+                    </button>
+                </div>`;
+                return;
+            }
 
-            const recentTransactions = [
-                ...db["Pendapatan"].map(x => ({...x, jenis: "Pendapatan"})),
-                ...db["Pengeluaran"].map(x => ({...x, jenis: "Pengeluaran"}))
-            ].sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal)).slice(0, 5);
+            // ============ HITUNG SEMUA ANGKA (Sync dengan struktur terbaru) ============
+            
+            // 1. Pendapatan (year filter)
+            let pendapatanList = filterByYear(db["Pendapatan"] || []);
+            let totalPendapatan = pendapatanList.reduce((s, x) => s + (Number(x.jumlah) || 0), 0);
+            let pendTunai = pendapatanList.filter(x => (x.status || "Tunai").toLowerCase() === "tunai").reduce((s,x) => s + (Number(x.jumlah)||0), 0);
+            let pendTransfer = pendapatanList.filter(x => (x.status || "").toLowerCase() === "transfer").reduce((s,x) => s + (Number(x.jumlah)||0), 0);
 
+            // 2. Pengeluaran ADMIN (dari Rencana Pengeluaran, bukan dari guru)
+            let pengeluaranAdminList = filterByYear(db["Rencana Pengeluaran"] || []).filter(x => !x._from_guru);
+            let totalPengeluaranAdmin = pengeluaranAdminList.reduce((s, x) => s + (Number(x.total) || 0), 0);
+            let pengAdminTunai = pengeluaranAdminList.filter(x => (x.status || "Tunai").toLowerCase() === "tunai").reduce((s,x) => s + (Number(x.total)||0), 0);
+            let pengAdminTransfer = pengeluaranAdminList.filter(x => (x.status || "").toLowerCase() === "transfer").reduce((s,x) => s + (Number(x.total)||0), 0);
+
+            // 3. Pengeluaran GURU (dari Pengajuan yang disetujui)
+            let pengajuanApproved = filterByYear(db["Pengajuan"] || []).filter(x => x.approval_status === "Disetujui");
+            let totalPengeluaranGuru = pengajuanApproved.reduce((s, x) => s + (Number(x.total) || 0), 0);
+
+            // 4. Total Pengeluaran (admin + guru)
+            let totalPengeluaran = totalPengeluaranAdmin + totalPengeluaranGuru;
+
+            // 5. Saldo
+            let saldo = totalPendapatan - totalPengeluaran;
+            let saldoTunai = pendTunai - pengAdminTunai;
+            let saldoTransfer = pendTransfer - pengAdminTransfer;
+
+            // 6. Menunggu Approval
+            let pendingRAB = (db["Status Anggaran Guru"] || [])
+                .filter(x => String(x.tahun) === String(TAHUN_AKTIF) && (x.status === "Menunggu" || x.status === "Menunggu Perubahan"))
+                .length;
+            let pendingPengajuan = filterByYear(db["Pengajuan"] || []).filter(x => x.approval_status === "Menunggu").length;
+            let totalPending = pendingRAB + pendingPengajuan;
+
+            // 7. Total plafon guru aktif
+            let plafonGuru = (db["Anggaran Kebutuhan Guru"] || [])
+                .filter(x => String(x.tahun) === String(TAHUN_AKTIF) && x.status === "Aktif")
+                .reduce((s, x) => s + (Number(x.plafon) || 0), 0);
+
+            // 8. Total plafon admin (RAB admin)
+            let plafonAdmin = filterByYear(db["Rencana Anggaran"] || [])
+                .filter(x => !x.nama_guru)
+                .reduce((s, x) => s + (Number(x.total) || 0), 0);
+
+            // ============ TRANSAKSI TERBARU (GABUNG 3 SUMBER) ============
+            let recent = [];
+            pendapatanList.forEach(x => {
+                recent.push({
+                    tanggal: x.tanggal,
+                    jenis: "Pendapatan",
+                    keterangan: x.keterangan || x.kategori || "-",
+                    jumlah: Number(x.jumlah) || 0,
+                    status: x.status || "Tunai",
+                    _jenisClass: "badge-success"
+                });
+            });
+            pengeluaranAdminList.forEach(x => {
+                recent.push({
+                    tanggal: x.tanggal,
+                    jenis: "Pengeluaran",
+                    keterangan: x.uraian || "-",
+                    jumlah: Number(x.total) || 0,
+                    status: x.status || "Tunai",
+                    _jenisClass: "badge-danger"
+                });
+            });
+            pengajuanApproved.forEach(x => {
+                recent.push({
+                    tanggal: x.tanggal,
+                    jenis: "Pengeluaran Guru",
+                    keterangan: `[${x.nama_guru}] ${x.kegiatan || "-"}`,
+                    jumlah: Number(x.total) || 0,
+                    status: "Disetujui",
+                    _jenisClass: "badge-warning"
+                });
+            });
+            recent.sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal));
+            recent = recent.slice(0, 8);
+
+            // ============ RENDER ============
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
-                    <div><h1>Dashboard Keuangan Sekolah</h1><p>Ringkasan Informasi Keuangan Sekolah</p></div>
-                </div>
-
-                <div class="cards">
-                    <div class="card"><div class="card-icon green"><i class="fa-solid fa-arrow-trend-up"></i></div><div class="card-title">Total Pendapatan</div><div class="card-value">${rupiah(income)}</div></div>
-                    <div class="card"><div class="card-icon red"><i class="fa-solid fa-arrow-trend-down"></i></div><div class="card-title">Total Pengeluaran</div><div class="card-value">${rupiah(expense)}</div></div>
-                    <div class="card"><div class="card-icon blue"><i class="fa-solid fa-wallet"></i></div><div class="card-title">Saldo</div><div class="card-value">${rupiah(balance)}</div></div>
-                    <div class="card" onclick="goToApproval()" style="cursor: pointer; transition: transform 0.2s;">
-                        <div class="card-icon" style="background: #fff3cd; color: #856404;"><i class="fa-solid fa-clock"></i></div>
-                        <div class="card-title">Menunggu Approval</div>
-                        <div class="card-value" id="valPendingApproval">0</div>
+                    <div>
+                        <h1>Dashboard Keuangan Sekolah</h1>
+                        <p>Ringkasan Informasi Keuangan • Tahun Anggaran <b>${TAHUN_AKTIF}</b></p>
                     </div>
                 </div>
 
-                <div class="box">
-                    <div class="box-title"><h3>Grafik Pendapatan & Pengeluaran</h3></div>
-                    <canvas id="monthlyChart" style="max-height: 300px;"></canvas>
+                <!-- YEAR BANNER -->
+                <div class="year-banner">
+                    <div>
+                        <div class="yb-label">Periode Aktif</div>
+                        <div class="yb-value">Tahun Anggaran ${TAHUN_AKTIF}</div>
+                    </div>
+                    <div class="yb-icon"><i class="fa-solid fa-calendar-check"></i></div>
                 </div>
 
+                <!-- 4 KARTU UTAMA -->
+                <div class="cards">
+                    <div class="card">
+                        <div class="card-icon green"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                        <div class="card-title">Total Pendapatan</div>
+                        <div class="card-value" style="color: #198754;">${rupiah(totalPendapatan)}</div>
+                        <div style="font-size:11px; color:var(--muted); margin-top:6px; display:flex; gap:10px;">
+                            <span><i class="fa-solid fa-money-bill-wave"></i> ${rupiah(pendTunai)}</span>
+                            <span><i class="fa-solid fa-building-columns"></i> ${rupiah(pendTransfer)}</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon red"><i class="fa-solid fa-arrow-trend-down"></i></div>
+                        <div class="card-title">Total Pengeluaran</div>
+                        <div class="card-value" style="color: #dc3545;">${rupiah(totalPengeluaran)}</div>
+                        <div style="font-size:11px; color:var(--muted); margin-top:6px;">
+                            Admin: <b>${rupiah(totalPengeluaranAdmin)}</b> • Guru: <b>${rupiah(totalPengeluaranGuru)}</b>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon blue"><i class="fa-solid fa-wallet"></i></div>
+                        <div class="card-title">Saldo Akhir</div>
+                        <div class="card-value" style="color: ${saldo >= 0 ? '#1d5d9b' : '#dc3545'};">${rupiah(saldo)}</div>
+                        <div style="font-size:11px; color:var(--muted); margin-top:6px; display:flex; gap:10px;">
+                            <span>💵 ${rupiah(saldoTunai)}</span>
+                            <span>🏦 ${rupiah(saldoTransfer)}</span>
+                        </div>
+                    </div>
+                    <div class="card" onclick="goToApproval()" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform=''">
+                        <div class="card-icon" style="background: #fff3cd; color: #856404;"><i class="fa-solid fa-clock"></i></div>
+                        <div class="card-title">Menunggu Approval</div>
+                        <div class="card-value" style="color: ${totalPending > 0 ? '#dc3545' : 'var(--muted)'};">${totalPending}</div>
+                        <div style="font-size:11px; color:var(--muted); margin-top:6px;">
+                            RAB: <b>${pendingRAB}</b> • Pencairan: <b>${pendingPengajuan}</b>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PLAFON INFO (COLLAPSIBLE) -->
+                <div class="kategori-belum-collapse" id="dashboardPlafonCollapse">
+                    <div class="sdc-header" onclick="toggleDashboardCollapse()">
+                        <div class="sdc-header-left">
+                            <i class="fa-solid fa-wallet" style="color: var(--primary2);"></i>
+                            <span>Ringkasan Plafon Anggaran</span>
+                            <span class="sdc-badge-count">${rupiah(plafonAdmin + plafonGuru)}</span>
+                            <i class="fa-solid fa-chevron-down sdc-chevron"></i>
+                        </div>
+                        <div class="sdc-header-hint">Klik untuk lihat detail</div>
+                    </div>
+                    <div class="sdc-body">
+                        <div class="sdc-body-inner" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                            <div class="kategori-belum-item" style="border-left-color: #1d5d9b;">
+                                <div class="kb-name" style="color: #1d5d9b;">Plafon Anggaran Admin</div>
+                                <div class="kb-value" style="color: #1d5d9b;">${rupiah(plafonAdmin)}</div>
+                                <div class="kb-count">RAB yang dibuat admin</div>
+                            </div>
+                            <div class="kategori-belum-item" style="border-left-color: #f39c12;">
+                                <div class="kb-name" style="color: #d97706;">Plafon Kebutuhan Guru</div>
+                                <div class="kb-value" style="color: #d97706;">${rupiah(plafonGuru)}</div>
+                                <div class="kb-count">Total plafon guru aktif</div>
+                            </div>
+                            <div class="kategori-belum-item" style="border-left-color: ${(totalPendapatan - plafonAdmin - plafonGuru) >= 0 ? '#22c55e' : '#dc3545'};">
+                                <div class="kb-name" style="color: ${(totalPendapatan - plafonAdmin - plafonGuru) >= 0 ? '#15803d' : '#b91c1c'};">Sisa Belum Dialokasikan</div>
+                                <div class="kb-value" style="color: ${(totalPendapatan - plafonAdmin - plafonGuru) >= 0 ? '#15803d' : '#b91c1c'};">${rupiah(totalPendapatan - plafonAdmin - plafonGuru)}</div>
+                                <div class="kb-count">Pendapatan − Plafon Admin − Plafon Guru</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GRAFIK BULANAN -->
+                <div class="box">
+                    <div class="box-title"><h3>Grafik Pendapatan & Pengeluaran Per Bulan</h3></div>
+                    <canvas id="monthlyChart" style="max-height: 320px;"></canvas>
+                </div>
+
+                <!-- TRANSAKSI TERBARU -->
                 <div class="box">
                     <div class="box-title"><h3>Transaksi Terbaru</h3></div>
                     <div class="table-wrapper">
                         <table>
-                            <thead><tr><th>Tanggal</th><th>Jenis</th><th>Keterangan</th><th>Jumlah</th><th>Status</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Jenis</th>
+                                    <th>Keterangan</th>
+                                    <th style="text-align:right;">Jumlah</th>
+                                    <th style="text-align:center;">Status</th>
+                                </tr>
+                            </thead>
                             <tbody>
-                                ${recentTransactions.map(x => `<tr><td>${formatDate(x.tanggal)}</td><td>${x.jenis}</td><td>${x.keterangan}</td><td>${rupiah(x.jumlah)}</td><td>${badge(x.status)}</td></tr>`).join("")}
+                                ${recent.length === 0 
+                                    ? `<tr><td colspan="5" style="text-align:center; padding: 25px; color:var(--muted);">Belum ada transaksi di tahun ${TAHUN_AKTIF}</td></tr>` 
+                                    : recent.map(x => `
+                                        <tr>
+                                            <td>${formatDate(x.tanggal)}</td>
+                                            <td><span class="badge ${x._jenisClass}">${x.jenis}</span></td>
+                                            <td>${x.keterangan}</td>
+                                            <td style="text-align:right; font-weight:bold; color:${x.jenis === "Pendapatan" ? '#198754' : '#dc3545'};">${rupiah(x.jumlah)}</td>
+                                            <td style="text-align:center;"><span class="badge badge-info">${x.status}</span></td>
+                                        </tr>
+                                    `).join("")}
                             </tbody>
                         </table>
                     </div>
                 </div>
             `;
+
             setTimeout(renderMonthlyChart, 100);
         }
 
+        /* =====================================================
+           GURU DASHBOARD
+        ===================================================== */
         function renderGuruDashboard() {
+            if (!TAHUN_AKTIF) {
+                document.getElementById("app").innerHTML = `
+                <div class="page-header"><div><h1>Selamat Datang, ${user.nama}</h1><p>Portal Pengelolaan Anggaran & Pengeluaran</p></div></div>
+                <div class="info-callout warning">
+                    <strong><i class="fa-solid fa-calendar-xmark"></i> Tahun Anggaran Belum Aktif</strong><br>
+                    Silakan hubungi admin untuk mengaktifkan tahun anggaran.
+                </div>`;
+                return;
+            }
+
+            // Ambil data guru yang login
+            let statusObj = (db["Status Anggaran Guru"] || []).find(x => x.guru === user.nama && String(x.tahun) === String(TAHUN_AKTIF));
+            let plafonObj = (db["Anggaran Kebutuhan Guru"] || []).find(x => x.guru === user.nama && String(x.tahun) === String(TAHUN_AKTIF));
+            
+            let plafon = plafonObj ? Number(plafonObj.plafon) : 0;
+            let plafonAktif = plafonObj && plafonObj.status === "Aktif";
+            
+            let rab = filterByYear(db["Rencana Anggaran"] || []).filter(x => x.nama_guru === user.nama);
+            let totalRAB = rab.reduce((s, x) => s + (Number(x.total) || 0), 0);
+            
+            let pengajuan = filterByYear(db["Pengajuan"] || []).filter(x => x.nama_guru === user.nama);
+            let pengajuanApproved = pengajuan.filter(x => x.approval_status === "Disetujui");
+            let pengajuanPending = pengajuan.filter(x => x.approval_status === "Menunggu");
+            let totalRealisasi = pengajuanApproved.reduce((s, x) => s + (Number(x.total) || 0), 0);
+            
+            let statusRAB = statusObj ? statusObj.status : null;
+            let statusLabel = statusRAB || "Belum Disusun";
+            let statusColor = statusRAB === "Disetujui" ? "#198754" : (statusRAB === "Draft" ? "#1d5d9b" : (statusRAB ? "#f39c12" : "#94a3b8"));
+
             document.getElementById("app").innerHTML = `
-                <div class="page-header"><div><h1>Selamat Datang, ${user.nama}</h1></div></div>
-                <div class="box"><p>Portal khusus tenaga pendidik</p></div>
+                <div class="page-header">
+                    <div>
+                        <h1>Selamat Datang, ${user.nama}</h1>
+                        <p>Portal Pengelolaan Anggaran • Tahun ${TAHUN_AKTIF}</p>
+                    </div>
+                </div>
+
+                <div class="year-banner">
+                    <div>
+                        <div class="yb-label">Periode Aktif</div>
+                        <div class="yb-value">Tahun Anggaran ${TAHUN_AKTIF}</div>
+                    </div>
+                    <div class="yb-icon"><i class="fa-solid fa-calendar-check"></i></div>
+                </div>
+
+                ${!plafonAktif ? `
+                <div class="info-callout warning">
+                    <strong><i class="fa-solid fa-lock"></i> Plafon Belum Ditetapkan Admin</strong><br>
+                    Admin belum menetapkan/mengaktifkan plafon anggaran untuk Anda. Hubungi admin untuk info lebih lanjut.
+                </div>` : `
+                <div class="info-callout" style="background:#eff6ff; border-left-color:#3b82f6;">
+                    <strong><i class="fa-solid fa-info-circle"></i> Status RAB: ${statusLabel}</strong><br>
+                    ${statusRAB === "Disetujui" ? "RAB Anda telah disetujui. Anda dapat mengajukan pengeluaran." :
+                      statusRAB === "Draft" ? "Silakan lengkapi RAB di menu Rencana Anggaran, lalu ajukan ke Admin." :
+                      statusRAB === "Menunggu" ? "RAB Anda sedang direview Admin." :
+                      statusRAB === "Menunggu Perubahan" ? "Permohonan perubahan RAB Anda sedang direview Admin." :
+                      "Silakan mulai menyusun RAB di menu Rencana Anggaran."}
+                </div>`}
+
+                <div class="cards">
+                    <div class="card">
+                        <div class="card-icon orange"><i class="fa-solid fa-wallet"></i></div>
+                        <div class="card-title">Plafon Anggaran Anda</div>
+                        <div class="card-value" style="color:#d97706;">${rupiah(plafon)}</div>
+                        <div style="font-size:11px; color:var(--muted); margin-top:6px;">
+                            Status: <b style="color:${plafonAktif ? '#198754' : '#94a3b8'};">${plafonObj ? plafonObj.status : "Belum Ditetapkan"}</b>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon blue"><i class="fa-solid fa-list-check"></i></div>
+                        <div class="card-title">Total RAB Disusun</div>
+                        <div class="card-value" style="color:#1d5d9b;">${rupiah(totalRAB)}</div>
+                        <div style="font-size:11px; color:var(--muted); margin-top:6px;">
+                            ${rab.length} item • Sisa plafon: <b>${rupiah(plafon - totalRAB)}</b>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon green"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+                        <div class="card-title">Realisasi Pengeluaran</div>
+                        <div class="card-value" style="color:#198754;">${rupiah(totalRealisasi)}</div>
+                        <div style="font-size:11px; color:var(--muted); margin-top:6px;">
+                            ${pengajuanApproved.length} pengajuan disetujui
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon" style="background:#fff3cd; color:#856404;"><i class="fa-solid fa-clock"></i></div>
+                        <div class="card-title">Menunggu Approval</div>
+                        <div class="card-value" style="color:${pengajuanPending.length > 0 ? '#dc3545' : 'var(--muted)'};">${pengajuanPending.length}</div>
+                        <div style="font-size:11px; color:var(--muted); margin-top:6px;">
+                            Pengajuan pengeluaran pending
+                        </div>
+                    </div>
+                </div>
             `;
         }
 
+        /* =====================================================
+           CHART BULANAN
+        ===================================================== */
         function renderMonthlyChart() {
             const ctx = document.getElementById("monthlyChart");
-            if(!ctx) return;
-            let inc = Array(12).fill(0), exp = Array(12).fill(0);
-            db["Pendapatan"].forEach(i => { inc[new Date(i.tanggal).getMonth()] += Number(i.jumlah); });
-            db["Pengeluaran"].forEach(i => { exp[new Date(i.tanggal).getMonth()] += Number(i.jumlah); });
+            if (!ctx) return;
 
-            new Chart(ctx, {
-                type: "bar", data: {
+            let incPerMonth = Array(12).fill(0);
+            let expPerMonth = Array(12).fill(0);
+
+            // Pendapatan (year filter)
+            filterByYear(db["Pendapatan"] || []).forEach(item => {
+                let d = new Date(item.tanggal);
+                if (!isNaN(d)) incPerMonth[d.getMonth()] += Number(item.jumlah) || 0;
+            });
+
+            // Pengeluaran admin
+            filterByYear(db["Rencana Pengeluaran"] || []).filter(x => !x._from_guru).forEach(item => {
+                let d = new Date(item.tanggal);
+                if (!isNaN(d)) expPerMonth[d.getMonth()] += Number(item.total) || 0;
+            });
+
+            // Pengeluaran guru approved
+            filterByYear(db["Pengajuan"] || []).filter(x => x.approval_status === "Disetujui").forEach(item => {
+                let d = new Date(item.tanggal);
+                if (!isNaN(d)) expPerMonth[d.getMonth()] += Number(item.total) || 0;
+            });
+
+            // Destroy chart lama jika ada
+            if (window._monthlyChartInstance) {
+                window._monthlyChartInstance.destroy();
+            }
+
+            window._monthlyChartInstance = new Chart(ctx, {
+                type: "bar",
+                data: {
                     labels: ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"],
-                    datasets: [{ label: "Pendapatan", backgroundColor: "#198754", data: inc }, { label: "Pengeluaran", backgroundColor: "#dc3545", data: exp }]
-                }, options: { responsive: true, maintainAspectRatio: false }
+                    datasets: [
+                        { 
+                            label: "Pendapatan", 
+                            backgroundColor: "#198754", 
+                            data: incPerMonth,
+                            borderRadius: 6
+                        }, 
+                        { 
+                            label: "Pengeluaran", 
+                            backgroundColor: "#dc3545", 
+                            data: expPerMonth,
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + rupiah(context.parsed.y);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    if (value >= 1000000) return (value/1000000) + 'jt';
+                                    if (value >= 1000) return (value/1000) + 'rb';
+                                    return value;
+                                }
+                            }
+                        }
+                    }
+                }
             });
         }
 
-                // Panggil fungsi ini di bagian bawah script agar langsung dieksekusi saat halaman dimuat
-        hitungPendingApproval();
-
-        function hitungPendingApproval() {
-            // Ambil data dari database
-            let dataPendapatan = db["Pendapatan"] || [];
-            let dataPengeluaran = db["Rencana Pengeluaran"] || [];
-
-            // Filter transaksi yang status approval-nya "Menunggu" atau kosong (default)
-            let pendingPendapatan = dataPendapatan.filter(x => !x.approval_status || x.approval_status === "Menunggu").length;
-            let pendingPengeluaran = dataPengeluaran.filter(x => !x.approval_status || x.approval_status === "Menunggu").length;
-
-            // Totalkan dan tampilkan ke kartu Dashboard
-            let totalPending = pendingPendapatan + pendingPengeluaran;
-            
-            let elPending = document.getElementById("valPendingApproval");
-            if(elPending) {
-                elPending.innerText = totalPending;
-                
-                // Beri efek warna merah jika ada tumpukan persetujuan
-                if(totalPending > 0) {
-                    elPending.style.color = "#dc3545"; 
-                }
-            }
-        }
-
-        // Fungsi untuk melompat langsung ke halaman Approval sub-menu Menunggu
+        /* =====================================================
+           NAVIGASI
+        ===================================================== */
         function goToApproval() {
             sessionStorage.setItem("targetMenu", "Menunggu");
             window.location.href = "approval.html";
+        }
+
+
+                /* =====================================================
+           TOGGLE DASHBOARD PLAFON COLLAPSE
+        ===================================================== */
+        function toggleDashboardCollapse() {
+            let el = document.getElementById("dashboardPlafonCollapse");
+            if (!el) return;
+            el.classList.toggle("open");
+            let hint = el.querySelector(".sdc-header-hint");
+            if (hint) {
+                hint.innerText = el.classList.contains("open") 
+                    ? "Klik untuk sembunyikan" 
+                    : "Klik untuk lihat detail";
+            }
         }
     </script>
 </body>

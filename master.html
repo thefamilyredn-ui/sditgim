@@ -6,16 +6,11 @@
     <title>Master Data - SIMKU SD GIM</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <!-- Library SweetAlert2 untuk Popup -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
-    <!-- ================= SIDEBAR UNIVERSAL ================= -->
-    <aside class="sidebar" id="sidebar">
-        
-    </aside>
+    <aside class="sidebar" id="sidebar"></aside>
 
-    <!-- ================= MAIN ================= -->
     <main class="main">
         <header class="topbar">
             <div class="topbar-left">
@@ -29,11 +24,9 @@
                 </div>
             </div>
         </header>
-
         <section class="content" id="app"></section>
     </main>
 
-    <!-- ================= MODAL & TOAST ================= -->
     <div class="modal" id="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -58,9 +51,11 @@
             const sidebar = document.getElementById('sidebar');
             if (sidebar.classList.contains('show')) sidebar.classList.remove('show');
         }
-
         function closeModal() { document.getElementById("modal").classList.remove("show"); }
 
+        /* =====================================================
+           PROFIL SEKOLAH
+        ===================================================== */
         function openProfile(){
             closeMobileSidebar();
             document.getElementById("topTitle").innerText = "Profil Sekolah";
@@ -112,6 +107,9 @@
             saveDB(); closeModal(); openProfile(); toast("Profil sekolah berhasil diperbarui");
         }
 
+        /* =====================================================
+           TABEL MASTER
+        ===================================================== */
         function openTable(name){
             closeMobileSidebar();
             document.getElementById("topTitle").innerText = name;
@@ -121,11 +119,26 @@
                 ? Object.keys(data[0]).filter(x => x !== "id" && x !== "password" && !(name === "Pengguna" && x === "status")) 
                 : getDefaultFields(name).filter(x => x !== "password");
 
+            // Info khusus Tahun Anggaran
+            let infoHtml = "";
+            if (name === "Tahun Anggaran") {
+                let aktif = data.find(x => x.status === "Aktif");
+                infoHtml = `
+                <div style="background: #e8f1ff; border-left: 4px solid var(--primary2); padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; color: #1c3d5a;">
+                    <strong><i class="fa-solid fa-info-circle"></i> Sistem Tahun Anggaran Tunggal</strong><br>
+                    Hanya boleh ada <b>1 tahun</b> aktif. Saat Anda mengaktifkan tahun lain, tahun lama otomatis dinonaktifkan.
+                    ${aktif ? `<br><br>📌 <b>Tahun Anggaran Aktif Saat Ini:</b> <span style="background: var(--success); color: white; padding: 3px 10px; border-radius: 12px; font-weight: bold; display: inline-block;">${aktif.tahun}</span> 
+                    <br><small style="color: var(--muted);">Semua data anggaran (Pendapatan, RAB, Pengeluaran, Realisasi) di halaman admin & guru hanya akan menampilkan data tahun <b>${aktif.tahun}</b>.</small>` 
+                    : `<br><br>⚠️ <b style="color: var(--danger);">Tidak ada tahun aktif!</b> Aktifkan salah satu tahun untuk mulai mengelola anggaran.`}
+                </div>`;
+            }
+
             document.getElementById("app").innerHTML=`
             <div class="page-header">
                 <div><h1>Master ${name}</h1><p>Kelola data ${name.toLowerCase()}</p></div>
                 <button class="btn btn-primary" onclick="openForm('${name}')"><i class="fa-solid fa-plus"></i> Tambah Data</button>
             </div>
+            ${infoHtml}
             <div class="box">
                 <div class="toolbar"><input class="search" placeholder="Cari data" onkeyup="searchTable(this.value,'${name}')"></div>
                 <div class="table-wrapper">
@@ -141,8 +154,30 @@
             if(data.length === 0) return `<tr><td colspan="${columns.length+1}" style="text-align:center">Data Kosong</td></tr>`;
             return data.map(row => `
                 <tr>
-                    ${columns.map(c => { let value = row[c]; if(c === "status") value = badge(value); return `<td>${value ?? "-"}</td>`; }).join("")}
-                    <td>
+                    ${columns.map(c => { 
+                        let value = row[c]; 
+                        if(c === "status") {
+                            if (name === "Tahun Anggaran") {
+                                value = value === "Aktif" 
+                                    ? `<span class="badge badge-success"><i class="fa-solid fa-check-circle"></i> Aktif</span>` 
+                                    : `<span class="badge badge-warning">Tidak Aktif</span>`;
+                            } else {
+                                value = badge(value);
+                            }
+                        }
+                        return `<td>${value ?? "-"}</td>`; 
+                    }).join("")}
+                    <td style="white-space: nowrap;">
+                        ${name === "Tahun Anggaran" && row.status !== "Aktif" ? `
+                            <button class="btn btn-success btn-sm" onclick="aktifkanTahun(${row.id})" title="Aktifkan Tahun Ini">
+                                <i class="fa-solid fa-power-off"></i> Aktifkan
+                            </button>
+                        ` : ''}
+                        ${name === "Tahun Anggaran" && row.status === "Aktif" ? `
+                            <span style="font-size: 11px; color: var(--success); font-weight: bold; display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; background: #dff5e8; border-radius: 6px;">
+                                <i class="fa-solid fa-circle-check"></i> Sedang Aktif
+                            </span>
+                        ` : ''}
                         <button class="btn btn-light btn-sm" onclick="openForm('${name}',${row.id})" title="Edit Data"><i class="fa-solid fa-pen" style="color: #1d5d9b;"></i></button>
                         <button class="btn btn-light btn-sm" onclick="deleteData('${name}',${row.id})" title="Hapus Data" style="background-color: #fff5f5; border: 1px solid #ffcccc;"><i class="fa-solid fa-trash" style="color: #dc3545;"></i></button>
                     </td>
@@ -157,6 +192,9 @@
             document.getElementById("tableBody").innerHTML = renderRows(name, filtered, columns);
         }
 
+        /* =====================================================
+           FORM
+        ===================================================== */
         function openForm(name, id=null){
             let item = id ? db[name].find(x => x.id === id) : null;
             document.getElementById("modal").classList.add("show");
@@ -170,13 +208,18 @@
                     let value = item?.[field]??""; let inputHtml = ""; let isFull = false;
 
                     if(field === "keterangan" || field === "alamat") { isFull = true; inputHtml = `<textarea name="${field}" required>${value}</textarea>`; } 
-                    else if (field === "status") { inputHtml = `<select name="${field}" required><option value="Aktif" ${value === "Aktif" ? "selected" : ""}>Aktif</option><option value="Tidak Aktif" ${value === "Tidak Aktif" ? "selected" : ""}>Tidak Aktif</option></select>`; } 
+                    else if (field === "status") { 
+                        inputHtml = `<select name="${field}" required>
+                            <option value="Aktif" ${value === "Aktif" ? "selected" : ""}>Aktif</option>
+                            <option value="Tidak Aktif" ${value === "Tidak Aktif" ? "selected" : ""}>Tidak Aktif</option>
+                        </select>`; 
+                    } 
                     else if (name === "Pengguna" && field === "role") { 
                         let hakAksesData = db["Hak Akses"] || []; 
                         let options = hakAksesData.map(h => `<option value="${h.nama}" ${value === h.nama ? "selected" : ""}>${h.nama}</option>`).join("");
                         inputHtml = `<select name="${field}" required>${options || '<option value="">-- Buat Hak Akses Terlebih Dahulu --</option>'}</select>`; 
                     } 
-                    else { inputHtml = `<input type="${field === "password" ? "text" : "text"}" name="${field}" value="${value}" required>`; }
+                    else { inputHtml = `<input type="text" name="${field}" value="${value}" required>`; }
 
                     return `<div class="form-group ${isFull ? "full" : ""}"><label style="text-transform:capitalize">${field}</label>${inputHtml}</div>`;
                 }).join("")}
@@ -187,23 +230,155 @@
         }
 
         function getDefaultFields(name){
-            const map={"Tahun Anggaran":["tahun","status"], "Pengguna":["nama","username","password","role"], "Hak Akses":["nama","keterangan"]};
+            const map={
+                "Tahun Anggaran":["tahun","status"], 
+                "Pengguna":["nama","username","password","role"], 
+                "Hak Akses":["nama","keterangan"]
+            };
             return map[name] || ["nama","keterangan"];
         }
 
+        /* =====================================================
+           SIMPAN — LOGIKA TAHUN ANGGARAN TUNGGAL
+        ===================================================== */
         function saveForm(name, id){
             const form = document.getElementById("dataForm");
             if(!form.checkValidity()) { toast("Mohon isi semua data"); return; }
 
-            const fd = new FormData(form); let obj = {}; fd.forEach((value,key) => obj[key] = value);
+            const fd = new FormData(form); 
+            let obj = {}; 
+            fd.forEach((value,key) => obj[key] = value);
 
-            if(id){ const index = db[name].findIndex(x => x.id === id); obj.id = id; db[name][index] = obj; toast("Data berhasil diperbarui"); }
-            else{ obj.id = Date.now(); if(!db[name]) db[name] = []; db[name].push(obj); toast("Data berhasil ditambahkan"); }
+            // ============ KHUSUS TAHUN ANGGARAN ============
+            if (name === "Tahun Anggaran") {
+                // Validasi duplikat tahun
+                let dupe = (db[name] || []).find(x => x.tahun === obj.tahun && x.id !== id);
+                if (dupe) {
+                    Swal.fire('Duplikat!', `Tahun <b>${obj.tahun}</b> sudah ada dalam sistem.`, 'warning');
+                    return;
+                }
+
+                // Jika status baru = Aktif → nonaktifkan semua tahun lain dulu
+                if (obj.status === "Aktif") {
+                    let tahunLama = (db[name] || []).find(x => x.status === "Aktif" && x.id !== id);
+                    
+                    let doSave = () => {
+                        // Nonaktifkan semua tahun lain
+                        (db[name] || []).forEach(t => {
+                            if (t.id !== id) t.status = "Tidak Aktif";
+                        });
+                        // Simpan / update
+                        if(id){ 
+                            const index = db[name].findIndex(x => x.id === id); 
+                            obj.id = id; 
+                            db[name][index] = obj; 
+                        } else { 
+                            obj.id = Date.now(); 
+                            if(!db[name]) db[name] = []; 
+                            db[name].push(obj); 
+                        }
+                        saveDB(); 
+                        closeModal(); 
+                        openTable(name);
+                        Swal.fire({
+                            title: 'Tahun Aktif Diubah!',
+                            html: `Tahun <b>${obj.tahun}</b> sekarang menjadi tahun aktif.<br><br>
+                                   <small style="color:var(--muted);">Semua data anggaran (admin & guru) otomatis menampilkan tahun ini saja.</small>`,
+                            icon: 'success',
+                            timer: 2500,
+                            showConfirmButton: false
+                        });
+                    };
+
+                    if (tahunLama) {
+                        Swal.fire({
+                            title: 'Ganti Tahun Aktif?',
+                            html: `Tahun aktif saat ini: <b style="color:var(--primary);">${tahunLama.tahun}</b><br><br>
+                                   Anda akan mengaktifkan tahun <b style="color:var(--success);">${obj.tahun}</b>.<br>
+                                   Tahun <b>${tahunLama.tahun}</b> akan otomatis menjadi <b>Tidak Aktif</b>.<br><br>
+                                   <small style="color:var(--muted);">Data anggaran tahun ${tahunLama.tahun} tetap tersimpan, hanya tidak ditampilkan di halaman input.</small>`,
+                            icon: 'question',
+                            showCancelButton: true,
+                            confirmButtonColor: '#198754',
+                            cancelButtonColor: '#6c757d',
+                            confirmButtonText: '<i class="fa-solid fa-check"></i> Ya, Ganti',
+                            cancelButtonText: 'Batal',
+                            reverseButtons: true
+                        }).then(res => {
+                            if (res.isConfirmed) doSave();
+                        });
+                    } else {
+                        doSave();
+                    }
+                    return;
+                }
+
+                // Status = Tidak Aktif → cek apakah ini satu-satunya tahun aktif
+                if (obj.status === "Tidak Aktif" && id) {
+                    let current = db[name].find(x => x.id === id);
+                    if (current && current.status === "Aktif") {
+                        let aktifLain = (db[name] || []).filter(x => x.status === "Aktif" && x.id !== id).length;
+                        if (aktifLain === 0) {
+                            Swal.fire({
+                                title: 'Peringatan!',
+                                html: `Anda akan menonaktifkan <b>satu-satunya</b> tahun aktif.<br><br>
+                                       Setelah ini, tidak ada tahun yang aktif — dan halaman anggaran (admin & guru) akan menampilkan peringatan untuk mengaktifkan tahun terlebih dahulu.<br><br>
+                                       Lanjutkan?`,
+                                icon: 'warning',
+                                showCancelButton: true,
+                                confirmButtonColor: '#dc3545',
+                                confirmButtonText: 'Ya, Nonaktifkan',
+                                cancelButtonText: 'Batal'
+                            }).then(res => {
+                                if (res.isConfirmed) {
+                                    const index = db[name].findIndex(x => x.id === id); 
+                                    obj.id = id; 
+                                    db[name][index] = obj; 
+                                    saveDB(); 
+                                    closeModal(); 
+                                    openTable(name);
+                                    toast("Tahun Anggaran dinonaktifkan");
+                                }
+                            });
+                            return;
+                        }
+                    }
+                }
+            }
+            // ============ END KHUSUS TAHUN ANGGARAN ============
+
+            // Simpan normal (Pengguna, Hak Akses, dst)
+            if(id){ 
+                const index = db[name].findIndex(x => x.id === id); 
+                obj.id = id; 
+                db[name][index] = obj; 
+                toast("Data berhasil diperbarui"); 
+            }
+            else{ 
+                obj.id = Date.now(); 
+                if(!db[name]) db[name] = []; 
+                db[name].push(obj); 
+                toast("Data berhasil ditambahkan"); 
+            }
             
             saveDB(); closeModal(); openTable(name);
         }
 
         function deleteData(name, id){
+            // Khusus Tahun Anggaran: cek apakah ini tahun aktif
+            if (name === "Tahun Anggaran") {
+                let item = (db[name] || []).find(x => x.id === id);
+                if (item && item.status === "Aktif") {
+                    Swal.fire({
+                        title: 'Tidak Bisa Dihapus!',
+                        html: `Tahun <b>${item.tahun}</b> sedang aktif.<br>Silakan aktifkan tahun lain terlebih dahulu sebelum menghapus tahun ini.`,
+                        icon: 'warning',
+                        confirmButtonText: 'Mengerti'
+                    });
+                    return;
+                }
+            }
+
             Swal.fire({
                 title: 'Hapus Data',
                 text: "Data yang dihapus tidak dapat dikembalikan",
@@ -224,17 +399,60 @@
             });
         }
 
-        // Jalankan profil saat pertama load
-        // BACA REQUEST DARI SIDEBAR DAN BUKA MENU YANG SESUAI
+        /* =====================================================
+           AKSI CEPAT: AKTIFKAN TAHUN ANGGARAN
+        ===================================================== */
+        function aktifkanTahun(id) {
+            let tahunBaru = (db["Tahun Anggaran"] || []).find(x => x.id === id);
+            if (!tahunBaru) return;
+            if (tahunBaru.status === "Aktif") { toast("Tahun ini sudah aktif"); return; }
+
+            let tahunLama = (db["Tahun Anggaran"] || []).find(x => x.status === "Aktif");
+
+            Swal.fire({
+                title: 'Aktifkan Tahun Anggaran?',
+                html: `
+                    ${tahunLama ? `Tahun aktif saat ini: <b style="color:var(--warning);">${tahunLama.tahun}</b><br><br>` : ''}
+                    Anda akan mengaktifkan tahun <b style="color:var(--success); font-size:16px;">${tahunBaru.tahun}</b>.<br>
+                    ${tahunLama ? `Tahun <b>${tahunLama.tahun}</b> akan otomatis menjadi <b>Tidak Aktif</b>.<br><br>` : ''}
+                    <small style="color:var(--muted);">Semua halaman anggaran (admin & guru) akan otomatis menampilkan tahun <b>${tahunBaru.tahun}</b> saja.</small>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#198754',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="fa-solid fa-power-off"></i> Ya, Aktifkan',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    // Nonaktifkan semua tahun lain, aktifkan yang dipilih
+                    (db["Tahun Anggaran"] || []).forEach(t => {
+                        t.status = (t.id === id) ? "Aktif" : "Tidak Aktif";
+                    });
+                    saveDB();
+                    openTable("Tahun Anggaran");
+                    Swal.fire({
+                        title: 'Tahun Anggaran Diaktifkan!',
+                        html: `Sekarang tahun <b style="color:var(--primary);">${tahunBaru.tahun}</b> yang berlaku di seluruh sistem.`,
+                        icon: 'success',
+                        timer: 2200,
+                        showConfirmButton: false
+                    });
+                }
+            });
+        }
+
+        // ROUTER
         const target = sessionStorage.getItem("targetMenu");
         if(target === "Tahun Anggaran" || target === "Pengguna" || target === "Hak Akses") {
             openTable(target);
-            document.getElementById('masterMenu').classList.add('open');
+            document.getElementById('masterMenu')?.classList.add('open');
         } else {
             openProfile();
-            document.getElementById('masterMenu').classList.add('open');
+            document.getElementById('masterMenu')?.classList.add('open');
         }
-        sessionStorage.removeItem("targetMenu"); // Bersihkan memori
+        sessionStorage.removeItem("targetMenu");
     </script>
 </body>
 </html>

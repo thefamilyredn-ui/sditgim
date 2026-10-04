@@ -1,16 +1,13 @@
 // sidebar.js - Template Sidebar Terpusat
-function renderSidebar(activeMenu = '') {
-    // 1. Ambil memori menu apa saja yang sedang terbuka
+function renderSidebar(activeMenu) {
+    activeMenu = activeMenu || ''; 
     let openMenus = JSON.parse(sessionStorage.getItem('openMenus')) || [];
 
-    // 2. Fungsi untuk mengecek dan mempertahankan menu tetap terbuka antar halaman
     const checkOpen = (menuId, menuList) => {
-        // Jika halaman saat ini berada di dalam menu ini, pastikan menu ini ikut tersimpan sebagai "terbuka"
         if (menuList.includes(activeMenu) && !openMenus.includes(menuId)) {
             openMenus.push(menuId);
             sessionStorage.setItem('openMenus', JSON.stringify(openMenus));
         }
-        // Jika menu ada di daftar memori, berikan class 'open'
         return openMenus.includes(menuId) ? 'open' : '';
     };
 
@@ -25,6 +22,7 @@ function renderSidebar(activeMenu = '') {
             <span>Dashboard</span>
         </div>
 
+        <!-- Master Data -->
         <div class="menu-item" onclick="toggleMenu('masterMenu')">
             <i class="fa-solid fa-database"></i>
             <span>Master Data</span>
@@ -37,28 +35,22 @@ function renderSidebar(activeMenu = '') {
             <div class="submenu-item" onclick="navigateMenu('master.html', 'Hak Akses')">Hak Akses</div>
         </div>
 
+        <!-- Menu Anggaran -->
         <div class="menu-item" onclick="toggleMenu('budgetMenu')">
             <i class="fa-solid fa-wallet"></i>
             <span>Anggaran</span>
             <i class="fa-solid fa-chevron-down arrow"></i>
         </div>
-        <div class="submenu ${checkOpen('budgetMenu', ['Rencana Anggaran', 'Rencana Pengeluaran', 'Realisasi'])}" id="budgetMenu">
+        <div class="submenu ${checkOpen('budgetMenu', ['Pendapatan', 'Rencana Anggaran', 'Anggaran Kebutuhan Guru', 'Rencana Pengeluaran', 'Pemindahan Kas', 'Realisasi'])}" id="budgetMenu">
+            <div class="submenu-item" onclick="navigateMenu('anggaran.html', 'Pendapatan')">Pendapatan</div>
             <div class="submenu-item" onclick="navigateMenu('anggaran.html', 'Rencana Anggaran')">Rencana Anggaran</div>
+            <div class="submenu-item" onclick="navigateMenu('anggaran.html', 'Anggaran Kebutuhan Guru')">Anggaran Kebutuhan Guru</div>
             <div class="submenu-item" onclick="navigateMenu('anggaran.html', 'Rencana Pengeluaran')">Rencana Pengeluaran</div>
+            <div class="submenu-item" onclick="navigateMenu('pemindahan-kas.html', 'Pemindahan Kas')">Pemindahan Kas</div>
             <div class="submenu-item" onclick="navigateMenu('anggaran.html', 'Realisasi')">Realisasi</div>
         </div>
 
-        <div class="menu-item" onclick="toggleMenu('transactionMenu')">
-            <i class="fa-solid fa-money-bill-transfer"></i>
-            <span>Transaksi</span>
-            <i class="fa-solid fa-chevron-down arrow"></i>
-        </div>
-        <div class="submenu ${checkOpen('transactionMenu', ['Pendapatan', 'Pengeluaran', 'Transfer Kas/Rekening'])}" id="transactionMenu">
-            <div class="submenu-item" onclick="navigateMenu('transaksi.html', 'Pendapatan')">Pendapatan</div>
-            <div class="submenu-item" onclick="navigateMenu('transaksi.html', 'Pengeluaran')">Pengeluaran</div>
-            <div class="submenu-item" onclick="navigateMenu('transaksi.html', 'Transfer Kas/Rekening')">Transfer Kas/Rekening</div>
-        </div>
-
+        <!-- Approval -->
         <div class="menu-item" onclick="toggleMenu('approvalMenu')">
             <i class="fa-solid fa-check-double"></i>
             <span>Approval</span>
@@ -70,6 +62,7 @@ function renderSidebar(activeMenu = '') {
             <div class="submenu-item" onclick="navigateMenu('approval.html', 'Ditolak')">Ditolak</div>
         </div>
 
+        <!-- Laporan -->
         <div class="menu-item" onclick="toggleMenu('reportMenu')">
             <i class="fa-solid fa-file-lines"></i>
             <span>Laporan</span>
@@ -81,6 +74,7 @@ function renderSidebar(activeMenu = '') {
             <div class="submenu-item" onclick="navigateMenu('laporan.html', 'Buku Kas Umum')">Buku Kas Umum</div>
         </div>
 
+        <!-- Pengaturan -->
         <div class="menu-item" onclick="toggleMenu('settingMenu')">
             <i class="fa-solid fa-gear"></i>
             <span>Pengaturan</span>
@@ -111,15 +105,13 @@ function navigateMenu(page, targetName) {
 
 function toggleMenu(id) {
     const el = document.getElementById(id);
+    if (!el) return;
     el.classList.toggle("open");
 
-    // 3. Rekam status buka/tutup ke memori saat menu diklik secara manual
     let openMenus = JSON.parse(sessionStorage.getItem('openMenus')) || [];
     if (el.classList.contains("open")) {
-        // Jika dibuka, tambahkan ke memori
         if (!openMenus.includes(id)) openMenus.push(id);
     } else {
-        // Jika ditutup manual, hapus dari memori
         openMenus = openMenus.filter(menuId => menuId !== id);
     }
     sessionStorage.setItem('openMenus', JSON.stringify(openMenus));

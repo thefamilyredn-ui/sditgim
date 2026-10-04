@@ -43,6 +43,25 @@
             <form id="dataForm"></form>
         </div>
     </div>
+        <!-- Modal Kelola Kategori Pendapatan -->
+    <div class="modal" id="modalKategori">
+        <div class="modal-content" style="max-width: 560px;">
+            <div class="modal-header">
+                <div>
+                    <h3>Kelola Kategori Pendapatan</h3>
+                    <p style="font-size:12px; color:var(--muted); margin-top:5px;">Tambahkan kategori baru atau ubah nama kategori existing</p>
+                </div>
+                <span class="close" onclick="closeKategoriModal()">&times;</span>
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <input type="text" id="newKategoriName" placeholder="Nama kategori baru..." style="flex: 1; padding: 11px; border: 1px solid #dce3ea; border-radius: 8px;">
+                <button class="btn btn-primary" onclick="tambahKategoriPendapatan()"><i class="fa-solid fa-plus"></i> Tambah</button>
+            </div>
+
+            <div id="kategoriListContainer" style="max-height: 380px; overflow-y: auto;"></div>
+        </div>
+    </div>
     <div class="toast" id="toast"></div>
 
     <script src="db.js"></script>
@@ -69,7 +88,7 @@
             return `<span class="badge ${cls}">${status || "-"}</span>`;
         }
 
-        /* =====================================================
+               /* =====================================================
            TAMPILAN TABEL TRANSAKSI & RINGKASAN SALDO
         ===================================================== */
         function openTable(name){
@@ -83,7 +102,6 @@
             let pengValid = (db["Pengeluaran"] || []).filter(x => x.status !== "Ditolak" && x.status !== "Menunggu");
             let transValid = (db["Transfer Kas/Rekening"] || []).filter(x => x.status !== "Ditolak" && x.status !== "Menunggu");
 
-            // 2. Hitung total
             let totalPend = total(pendValid);
             let totalPeng = total(pengValid);
             let totalTrans = total(transValid);
@@ -91,7 +109,7 @@
             let saldo = totalPend - totalPeng;
             let saldoTransfer = totalPend - totalTrans;
             
-            // 3. Logika Disable Tombol (Terkunci jika totalPend == 0)
+            // 2. Tombol Aksi
             let btnHtml = "";
             if ((name === "Pengeluaran" || name === "Transfer Kas/Rekening") && totalPend === 0) {
                 btnHtml = `<button class="btn" style="background: var(--muted); color: white; cursor: not-allowed;" onclick="toast('Pastikan data pendapatan sudah terisi terlebih dahulu')"><i class="fa-solid fa-lock"></i> Tambah Transaksi</button>`;
@@ -99,15 +117,15 @@
                 btnHtml = `<button class="btn btn-primary" onclick="openForm('${name}')"><i class="fa-solid fa-plus"></i> Tambah Transaksi</button>`;
             }
 
-            // 4. Siapkan elemen HTML untuk Ringkasan di pojok kanan
+            // 3. Tambahan tombol khusus Pendapatan: Kelola Kategori
+            let extraBtn = "";
+            if (name === "Pendapatan") {
+                extraBtn = `<button class="btn btn-light" style="border: 1px solid #dce3ea;" onclick="openKategoriModal()"><i class="fa-solid fa-tags" style="color: var(--primary2);"></i> Kelola Kategori</button>`;
+            }
+
+            // 4. Summary untuk toolbar (bukan Pendapatan)
             let summaryHtml = "";
-            if(name === "Pendapatan") {
-                summaryHtml = `
-                <div style="text-align: right; display: flex; align-items: center;">
-                    <span style="color: var(--muted); margin-right: 5px;">Total Pendapatan:</span> 
-                    <strong style="color: var(--success); font-size: 16px;">${rupiah(totalPend)}</strong>
-                </div>`;
-            } else if (name === "Pengeluaran") {
+            if (name === "Pengeluaran") {
                 summaryHtml = `
                 <div style="display: flex; gap: 15px; align-items: center; text-align: right; font-size: 13px; flex-wrap: wrap; justify-content: flex-end;">
                     <div><span style="color: var(--muted);">Pendapatan:</span> <strong style="color: var(--success);">${rupiah(totalPend)}</strong></div>
@@ -120,8 +138,8 @@
             } else if (name === "Transfer Kas/Rekening") {
                 summaryHtml = `
                 <div style="display: flex; gap: 15px; align-items: center; text-align: right; font-size: 13px; flex-wrap: wrap; justify-content: flex-end;">
-                    <div><span style="color: var(--muted);">Total Pendapatan:</span> <strong style="color: var(--success);">${rupiah(totalPend)}</strong></div>
-                    <div><span style="color: var(--muted);">Total Transfer:</span> <strong style="color: var(--warning);">${rupiah(totalTrans)}</strong></div>
+                    <div><span style="color: var(--muted);">Pendapatan:</span> <strong style="color: var(--success);">${rupiah(totalPend)}</strong></div>
+                    <div><span style="color: var(--muted);">Transfer:</span> <strong style="color: var(--warning);">${rupiah(totalTrans)}</strong></div>
                     <div style="padding-left: 15px; border-left: 2px solid var(--border);">
                         <span style="color: var(--primary); font-weight: bold;">Saldo:</span> 
                         <strong style="font-size: 15px; color: var(--primary);">${rupiah(saldoTransfer)}</strong>
@@ -129,26 +147,267 @@
                 </div>`;
             }
 
-            // 5. Render halaman
-            document.getElementById("app").innerHTML=`
-            <div class="page-header">
-                <div><h1>Data ${name}</h1><p>Kelola pencatatan ${name.toLowerCase()} sekolah</p></div>
-                ${btnHtml}
-            </div>
-            
-            <div class="box">
-                <div class="toolbar" style="align-items: center;">
-                    <input class="search" placeholder="Cari transaksi" onkeyup="searchTable(this.value,'${name}')">
-                    ${summaryHtml}
+            // 5. RENDER — KHUSUS PENDAPATAN pakai widget kartu per kategori
+            if (name === "Pendapatan") {
+                document.getElementById("app").innerHTML = `
+                <div class="page-header">
+                    <div><h1>Data Pendapatan</h1><p>Kelola pencatatan pendapatan sekolah per kategori</p></div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        ${extraBtn}
+                        ${btnHtml}
+                    </div>
+                </div>
+
+                <!-- Hero Total Pendapatan -->
+                <div class="total-pendapatan-hero">
+                    <div>
+                        <div class="hero-label">TOTAL SELURUH PENDAPATAN</div>
+                        <div class="hero-value">${rupiah(totalPend)}</div>
+                        <div style="font-size: 12px; opacity: 0.85; margin-top: 6px;">
+                            ${pendValid.length} transaksi • ${getKategoriPendapatanList().length} kategori
+                        </div>
+                    </div>
+                    <div class="hero-icon"><i class="fa-solid fa-sack-dollar"></i></div>
+                </div>
+
+                <!-- Widget Per Kategori -->
+                <div class="kategori-widgets" id="kategoriWidgets">
+                    ${renderKategoriPendapatanWidgets(pendValid, totalPend)}
+                </div>
+
+                <!-- Tabel Data -->
+                <div class="box">
+                    <div class="toolbar" style="align-items: center;">
+                        <input class="search" placeholder="Cari transaksi pendapatan..." onkeyup="searchTable(this.value,'${name}')">
+                    </div>
+                    
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr>${columns.map(c=>`<th style="text-transform:capitalize">${c}</th>`).join("")}<th>Aksi</th></tr></thead>
+                            <tbody id="tableBody">${renderRows(name, data, columns)}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+            } else {
+                document.getElementById("app").innerHTML=`
+                <div class="page-header">
+                    <div><h1>Data ${name}</h1><p>Kelola pencatatan ${name.toLowerCase()} sekolah</p></div>
+                    ${btnHtml}
                 </div>
                 
-                <div class="table-wrapper">
-                    <table>
-                        <thead><tr>${columns.map(c=>`<th style="text-transform:capitalize">${c}</th>`).join("")}<th>Aksi</th></tr></thead>
-                        <tbody id="tableBody">${renderRows(name, data, columns)}</tbody>
-                    </table>
-                </div>
-            </div>`;
+                <div class="box">
+                    <div class="toolbar" style="align-items: center;">
+                        <input class="search" placeholder="Cari transaksi" onkeyup="searchTable(this.value,'${name}')">
+                        ${summaryHtml}
+                    </div>
+                    
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr>${columns.map(c=>`<th style="text-transform:capitalize">${c}</th>`).join("")}<th>Aksi</th></tr></thead>
+                            <tbody id="tableBody">${renderRows(name, data, columns)}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+            }
+        }
+
+        /* =====================================================
+           WIDGET KATEGORI PENDAPATAN
+        ===================================================== */
+        function getKategoriPendapatanList() {
+            let list = db["Kategori Pendapatan"] || [];
+            if (list.length === 0) {
+                list = [{nama: "Dana BOS"}, {nama: "Sumbangan Pendidikan"}, {nama: "Pendapatan Lain-lain"}];
+                db["Kategori Pendapatan"] = list;
+                saveDB();
+            }
+            return list.map(k => typeof k === 'string' ? {nama: k} : k);
+        }
+
+        function renderKategoriPendapatanWidgets(pendValid, grandTotal) {
+            let kategoris = getKategoriPendapatanList();
+            if (kategoris.length === 0) {
+                return `<div class="box" style="grid-column: 1 / -1; text-align:center; color: var(--muted); padding: 30px;">
+                    Belum ada kategori. Klik "Kelola Kategori" untuk menambahkan.
+                </div>`;
+            }
+            
+            let grand = grandTotal || 1;
+            
+            return kategoris.map(k => {
+                let nama = k.nama;
+                let items = pendValid.filter(x => x.kategori === nama);
+                let totalKat = items.reduce((s, x) => s + (Number(x.jumlah) || 0), 0);
+                let persen = Math.round((totalKat / grand) * 100);
+                if (persen > 100) persen = 100;
+                if (grandTotal === 0) persen = 0;
+                
+                return `
+                <div class="kategori-widget">
+                    <div class="kw-header">
+                        <div class="kw-title">${nama}</div>
+                        <div class="kw-count">${items.length} trx</div>
+                    </div>
+                    <div class="kw-value">${rupiah(totalKat)}</div>
+                    <div class="kw-bar">
+                        <div class="kw-bar-inner" style="width: ${persen}%;"></div>
+                    </div>
+                    <div style="font-size: 11px; color: var(--muted); margin-top: 6px;">
+                        ${persen}% dari total pendapatan
+                    </div>
+                </div>`;
+            }).join("");
+        }
+
+        /* =====================================================
+           MODAL KELOLA KATEGORI
+        ===================================================== */
+        function openKategoriModal() {
+            document.getElementById("newKategoriName").value = "";
+            renderKategoriList();
+            document.getElementById("modalKategori").classList.add("show");
+        }
+
+        function closeKategoriModal() {
+            document.getElementById("modalKategori").classList.remove("show");
+        }
+
+        function renderKategoriList() {
+            let kategoris = getKategoriPendapatanList();
+            let pendapatan = db["Pendapatan"] || [];
+            let container = document.getElementById("kategoriListContainer");
+            
+            if (kategoris.length === 0) {
+                container.innerHTML = `<div class="kat-empty">
+                    <i class="fa-solid fa-inbox" style="font-size: 28px; display: block; margin-bottom: 10px; opacity: 0.4;"></i>
+                    Belum ada kategori. Tambahkan kategori baru di atas.
+                </div>`;
+                return;
+            }
+            
+            container.innerHTML = kategoris.map((k, idx) => {
+                let nama = k.nama;
+                let count = pendapatan.filter(x => x.kategori === nama).length;
+                let totalKat = pendapatan.filter(x => x.kategori === nama).reduce((s, x) => s + (Number(x.jumlah) || 0), 0);
+                return `
+                <div class="kat-row">
+                    <div class="kat-info">
+                        <div class="kat-name">${nama}</div>
+                        <div class="kat-usage">${count} transaksi • ${rupiah(totalKat)}</div>
+                    </div>
+                    <div class="kat-actions">
+                        <button class="btn btn-light btn-sm" onclick="editKategoriPendapatan(${idx})" title="Ubah nama"><i class="fa-solid fa-pen" style="color: var(--primary2);"></i></button>
+                        <button class="btn btn-light btn-sm" style="background:#fff5f5; border:1px solid #ffcccc;" onclick="hapusKategoriPendapatan(${idx})" title="Hapus"><i class="fa-solid fa-trash" style="color: var(--danger);"></i></button>
+                    </div>
+                </div>`;
+            }).join("");
+        }
+
+        function tambahKategoriPendapatan() {
+            let nama = document.getElementById("newKategoriName").value.trim();
+            if (!nama) {
+                toast("Masukkan nama kategori!");
+                return;
+            }
+            
+            let kategoris = getKategoriPendapatanList();
+            if (kategoris.some(k => k.nama.toLowerCase() === nama.toLowerCase())) {
+                toast("Kategori dengan nama ini sudah ada!");
+                return;
+            }
+            
+            if (!db["Kategori Pendapatan"]) db["Kategori Pendapatan"] = [];
+            // Normalize semua jadi {nama: "..."} format
+            db["Kategori Pendapatan"] = kategoris.map(k => ({nama: k.nama}));
+            db["Kategori Pendapatan"].push({nama: nama});
+            
+            saveDB();
+            document.getElementById("newKategoriName").value = "";
+            renderKategoriList();
+            toast(`Kategori "${nama}" berhasil ditambahkan`);
+        }
+
+        function editKategoriPendapatan(idx) {
+            let kategoris = getKategoriPendapatanList();
+            let oldNama = kategoris[idx].nama;
+            
+            Swal.fire({
+                title: 'Ubah Nama Kategori',
+                input: 'text',
+                inputValue: oldNama,
+                inputPlaceholder: 'Nama kategori baru...',
+                showCancelButton: true,
+                confirmButtonText: 'Simpan',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#1d5d9b',
+                inputValidator: (val) => {
+                    if (!val.trim()) return 'Nama tidak boleh kosong';
+                    if (val.trim().toLowerCase() !== oldNama.toLowerCase() && kategoris.some(k => k.nama.toLowerCase() === val.trim().toLowerCase())) {
+                        return 'Nama kategori sudah digunakan';
+                    }
+                }
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    let newNama = res.value.trim();
+                    if (newNama === oldNama) return;
+                    
+                    // Update kategori
+                    db["Kategori Pendapatan"] = kategoris.map(k => ({nama: k.nama}));
+                    db["Kategori Pendapatan"][idx] = {nama: newNama};
+                    
+                    // Update semua transaksi yang pakai kategori ini
+                    (db["Pendapatan"] || []).forEach(x => {
+                        if (x.kategori === oldNama) x.kategori = newNama;
+                    });
+                    
+                    saveDB();
+                    renderKategoriList();
+                    toast(`Kategori diubah menjadi "${newNama}"`);
+                }
+            });
+        }
+
+        function hapusKategoriPendapatan(idx) {
+            let kategoris = getKategoriPendapatanList();
+            let nama = kategoris[idx].nama;
+            let count = (db["Pendapatan"] || []).filter(x => x.kategori === nama).length;
+            
+            if (count > 0) {
+                Swal.fire({
+                    title: 'Tidak Bisa Dihapus',
+                    html: `Kategori <b>"${nama}"</b> masih digunakan oleh <b>${count} transaksi</b>.<br><br>Pindahkan atau hapus transaksi tersebut terlebih dahulu.`,
+                    icon: 'warning',
+                    confirmButtonText: 'Mengerti'
+                });
+                return;
+            }
+            
+            Swal.fire({
+                title: 'Hapus Kategori?',
+                html: `Kategori <b>"${nama}"</b> akan dihapus permanen.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonText: 'Batal',
+                confirmButtonText: 'Ya, Hapus'
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    db["Kategori Pendapatan"] = kategoris.map(k => ({nama: k.nama}));
+                    db["Kategori Pendapatan"].splice(idx, 1);
+                    saveDB();
+                    renderKategoriList();
+                    toast(`Kategori "${nama}" dihapus`);
+                }
+            });
+        }
+
+        function refreshKategoriWidgets() {
+            let pendValid = (db["Pendapatan"] || []).filter(x => x.status !== "Ditolak" && x.status !== "Menunggu");
+            let totalPend = total(pendValid);
+            let container = document.getElementById("kategoriWidgets");
+            if (container) {
+                container.innerHTML = renderKategoriPendapatanWidgets(pendValid, totalPend);
+            }
         }
 
         function renderRows(name, data, columns){
@@ -238,9 +497,10 @@
                         let formattedValue = value ? Number(value).toLocaleString('id-ID') : "";
                         inputHtml = `<input type="text" name="${field}" value="${formattedValue}" oninput="formatRupiahInput(this)" placeholder="Ketik nominal" required>`; 
                     }
-                    else if (field === "kategori" && name === "Pendapatan") { 
-                        let kats = db["Kategori Pendapatan"] || [{nama: "Dana BOS"}, {nama: "Sumbangan Pendidikan"}, {nama: "Pendapatan Lain-lain"}];
-                        let opts = kats.map(k => `<option value="${k.nama}" ${value === k.nama ? "selected" : ""}>${k.nama}</option>`).join("");
+                     else if (field === "kategori" && name === "Pendapatan") { 
+                        let kats = getKategoriPendapatanList();
+                        let opts = `<option value="">-- Pilih Kategori --</option>` + 
+                            kats.map(k => `<option value="${k.nama}" ${value === k.nama ? "selected" : ""}>${k.nama}</option>`).join("");
                         inputHtml = `<select name="${field}" required>${opts}</select>`; 
                     }
                     // PERUBAHAN: Kategori Pengeluaran Baru Sesuai Request

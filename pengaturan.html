@@ -280,17 +280,86 @@
                     reader.onload = function(e) {
                         try {
                             const restoredData = JSON.parse(e.target.result);
-                            if (typeof restoredData === 'object' && restoredData !== null) {
-                                db = restoredData;
-                                saveDB();
-                                logActivity("Melakukan Restore Data Sistem dari file JSON");
-                                Swal.fire('Berhasil!', 'Data sistem telah berhasil dipulihkan', 'success')
-                                .then(() => { location.reload(); });
-                            } else {
-                                throw new Error();
+                            
+                            // ============ VALIDASI STRUKTUR ============
+                            if (typeof restoredData !== 'object' || restoredData === null) {
+                                throw new Error("Bukan object valid");
                             }
+                            if (!restoredData["Pengguna"] || !Array.isArray(restoredData["Pengguna"]) || restoredData["Pengguna"].length === 0) {
+                                throw new Error("File tidak punya data Pengguna — kemungkinan bukan file backup SIMKU");
+                            }
+                            
+                            // ============ AUTO-MIGRATION (Pastikan koleksi baru ada) ============
+                            const migrations = {
+                                "Pengguna": [],
+                                "Hak Akses": [],
+                                "Tahun Anggaran": [],
+                                "Pendapatan": [],
+                                "Pengeluaran": [],
+                                "Rencana Anggaran": [],
+                                "Rencana Pengeluaran": [],
+                                "Anggaran Kebutuhan Guru": [],
+                                "Status Anggaran Guru": [],
+                                "Pengajuan": [],
+                                "Pemindahan Kas": [],
+                                "Kategori Pendapatan": [
+                                    {nama: "Dana BOS"},
+                                    {nama: "Sumbangan Pendidikan"},
+                                    {nama: "Pendapatan Lain-lain"}
+                                ],
+                                "Kategori Belanja": [
+                                    {nama: "ATK"},
+                                    {nama: "Operasional"},
+                                    {nama: "Kegiatan Pembelajaran"},
+                                    {nama: "Perlengkapan Kelas"}
+                                ],
+                                "Log Aktivitas": []
+                            };
+                            
+                            let migratedCount = 0;
+                            Object.keys(migrations).forEach(key => {
+                                if (!restoredData[key] || !Array.isArray(restoredData[key])) {
+                                    restoredData[key] = migrations[key];
+                                    migratedCount++;
+                                }
+                            });
+                            
+                            // Pastikan profile ada
+                            if (!restoredData.profile || typeof restoredData.profile !== 'object') {
+                                restoredData.profile = {
+                                    nama: "SD GIM BEKASI", npsn: "12345678", nss: "10101010",
+                                    alamat: "Jl. Pendidikan No. 10, Bekasi", kepala: "Kepala Sekolah",
+                                    bendahara: "Bendahara", telepon: "-", email: "-"
+                                };
+                                migratedCount++;
+                            }
+                            
+                            // ============ SIMPAN ============
+                            db = restoredData;
+                            saveDB();
+                            logActivity("Restore Data Sistem dari file JSON" + (migratedCount > 0 ? ` (${migratedCount} koleksi baru di-init)` : ""));
+                            
+                            Swal.fire({
+                                title: 'Berhasil Dipulihkan!',
+                                html: migratedCount > 0 
+                                    ? `Data berhasil dipulihkan.<br><br>
+                                       <small style="color:var(--muted);">
+                                            <b>${migratedCount}</b> koleksi baru ditambahkan otomatis karena file backup lama tidak memilikinya 
+                                            (mis. Kategori Belanja, Pemindahan Kas, dll).
+                                       </small>`
+                                    : `Data berhasil dipulihkan tanpa perubahan struktur.`,
+                                icon: 'success'
+                            }).then(() => { location.reload(); });
+                            
                         } catch (err) {
-                            Swal.fire('Error', 'File yang diunggah tidak valid', 'error');
+                            console.error("Restore error:", err);
+                            Swal.fire({
+                                title: 'File Tidak Valid',
+                                html: `File yang Anda unggah <b>bukan file backup SIMKU</b> yang valid, atau rusak.<br><br>
+                                       <small style="color:var(--muted); font-size:12px;">Error: ${err.message || 'Unknown'}</small><br><br>
+                                       <b>Tips:</b> Pastikan file di-download dari menu <b>Pengaturan → Backup Data</b>.`,
+                                icon: 'error'
+                            });
                         }
                     };
                     reader.readAsText(input.files[0]);
@@ -312,12 +381,12 @@
                 reverseButtons: true
             }).then((result) => {
                 if (result.isConfirmed) {
-                    localStorage.clear(); 
-                    db = {}; 
-                    saveDB();
-                    logActivity("Melakukan Reset Total Data Sistem");
-                    Swal.fire('Ter-reset!', 'Seluruh data aplikasi telah dikosongkan', 'success')
-                    .then(() => { location.reload(); });
+                    // Hapus DB_KEY dan currentUser saja
+                    localStorage.removeItem("SIM_KEUANGAN_SEKOLAH_V1");
+                    localStorage.removeItem("currentUser");
+                    
+                    Swal.fire('Ter-reset!', 'Seluruh data aplikasi telah dikembalikan ke pengaturan awal', 'success')
+                    .then(() => { window.location.href = "index.html"; });
                 }
             });
         }

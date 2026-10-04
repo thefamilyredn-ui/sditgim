@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Guru - SIMKU SD GIM</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        .badge-status { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .badge-status.menunggu { background: #fff0cf; color: #9a6500; }
+        .badge-status.disetujui { background: #dff5e8; color: #198754; }
+        .badge-status.ditolak { background: #fde2e2; color: #dc3545; }
+        .badge-status.draft { background: #e2e8f0; color: #475569; }
+        
+        .info-callout { background: #e8f1ff; border-left: 4px solid var(--primary2); padding: 14px 18px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; color: #1c3d5a; }
+        .info-callout.warning { background: #fff8e6; border-left-color: #f59e0b; color: #92400e; }
+        .info-callout.success { background: #f0fdf4; border-left-color: #22c55e; color: #166534; }
+        .info-callout.danger { background: #fef2f2; border-left-color: #ef4444; color: #991b1b; }
+
+        .badge-locked { display: inline-flex; align-items: center; gap: 4px; background: #f1f5f9; color: #64748b; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
+
+        /* Summary Card Modal Perubahan */
+        .plafon-summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; text-align: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
+        .plafon-summary .ps-item .ps-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+        .plafon-summary .ps-item .ps-value { font-size: 17px; font-weight: bold; }
+        .plafon-over { background: #fef2f2; border-color: #fecaca; }
+
+        .item-tag-new { font-size: 10px; background: #22c55e; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold; vertical-align: middle; margin-left: 5px; }
+        .item-tag-edit { font-size: 10px; background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold; vertical-align: middle; margin-left: 5px; }
+
+        .progress-bar-outer { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+        .progress-bar-inner { height: 100%; transition: width 0.3s, background 0.3s; }
+    </style>
+</head>
+<body>
+    <aside class="sidebar" id="sidebar">
+        <div class="brand">
+            <h2><i class="fa-solid fa-school"></i> SIMKU SD GIM</h2>
+            <p>Portal Tenaga Pendidik & Guru</p>
+        </div>
+
+        <div class="menu-item active" id="menu-dashboard" onclick="loadGuruPage('dashboard')">
+            <i class="fa-solid fa-chart-line"></i>
+            <span>Dashboard</span>
+        </div>
+
+        <div class="menu-item" id="menu-rencana" onclick="loadGuruPage('rencana_anggaran')">
+            <i class="fa-solid fa-list-check"></i>
+            <span>Rencana Anggaran</span>
+        </div>
+
+        <div class="menu-item" id="menu-pengajuan" onclick="loadGuruPage('pengajuan')">
+            <i class="fa-solid fa-file-invoice-dollar"></i>
+            <span>Pengajuan Pengeluaran</span>
+        </div>
+
+        <div class="menu-item" onclick="confirmLogout()" style="margin-top: 25px; color: #ff9b9b;">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Logout</span>
+        </div>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('show')">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <h3 id="topTitle">Dashboard Guru</h3>
+            </div>
+            <div class="user-box">
+                <div class="avatar"><i class="fa-solid fa-chalkboard-user"></i></div>
+                <div class="user-text">
+                    <strong id="userDisplayName">Guru</strong><br>
+                    <small id="userDisplayRole">Guru</small>
+                </div>
+            </div>
+        </header>
+
+        <section class="content" id="app"></section>
+    </main>
+
+    <!-- MODAL RENCANA ANGGARAN (dipakai untuk mode Draft) -->
+        <div class="modal" id="modalRencana">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitleRencana">Tambah Rencana Anggaran</h3>
+                <span class="close" onclick="closeRencanaModal()">&times;</span>
+            </div>
+            <form id="formRencana">
+                <input type="hidden" id="rencana_id">
+                <div class="form-grid">
+                    <div class="form-group full">
+                        <label>Kategori Belanja</label>
+                        <input type="text" id="rencana_kategori_belanja" required list="daftarKategoriBelanja" placeholder="Contoh: ATK, Kegiatan Pembelajaran, dst.">
+                        <datalist id="daftarKategoriBelanja"></datalist>
+                        <small style="color:var(--muted); font-size:11px;">Ketik nama kategori belanja (bisa yang sudah ada atau buat baru)</small>
+                    </div>
+                    <div class="form-group full">
+                        <label>Uraian Kebutuhan / Barang</label>
+                        <input type="text" id="rencana_uraian" required placeholder="Contoh: Pembelian Buku Tematik Kelas 5">
+                    </div>
+                    <div class="form-group">
+                        <label>Volume (Jumlah)</label>
+                        <input type="number" id="rencana_volume" min="1" required oninput="calcRencanaTotal()">
+                    </div>
+                    <div class="form-group">
+                        <label>Estimasi Harga Satuan (Rp)</label>
+                        <input type="text" id="rencana_nilai" required oninput="formatRupiahInput(this); calcRencanaTotal()">
+                    </div>
+                    <div class="form-group full">
+                        <label>Total Anggaran (Rp)</label>
+                        <input type="text" id="rencana_total" readonly style="background:#eef2f6; font-weight:bold;">
+                    </div>
+                </div>
+                <div style="margin-top:20px; text-align:right;">
+                    <button type="button" class="btn btn-light" onclick="closeRencanaModal()">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan Rencana</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL PERUBAHAN ANGGARAN (dipakai untuk mode Disetujui) -->
+    <div class="modal" id="modalPerubahan">
+        <div class="modal-content" style="max-width: 860px;">
+            <div class="modal-header">
+                <div>
+                    <h3 id="perubahanTitle">Ajukan Perubahan Anggaran</h3>
+                    <p id="perubahanSubtitle" style="font-size:12px; color:var(--muted); margin-top:4px;">Kelola item anggaran Anda dalam batas plafon yang telah disetujui</p>
+                </div>
+                <span class="close" onclick="closePerubahanModal()">&times;</span>
+            </div>
+            <div id="perubahanContent"></div>
+        </div>
+    </div>
+
+    <!-- MODAL PENGAJUAN PENGELUARAN -->
+    <div class="modal" id="modalPengajuan">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitlePengajuan">Formulir Pengajuan Pengeluaran</h3>
+                <span class="close" onclick="closePengajuanModal()">&times;</span>
+            </div>
+            <form id="formPengajuan">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Nomor Pengajuan</label>
+                        <input type="text" id="pengajuan_nomor" readonly style="background: #eef2f6; font-weight: bold;">
+                    </div>
+                    <div class="form-group">
+                        <label>Tanggal Pengajuan</label>
+                        <input type="date" id="pengajuan_tanggal" required>
+                    </div>
+                    <div class="form-group full">
+                        <label>Pilih Dari Rencana Anggaran Anda</label>
+                        <select id="pengajuan_uraian_anggaran" required onchange="autoFillPengajuan()">
+                        </select>
+                    </div>
+                    <div class="form-group full">
+                        <label>Nama Kegiatan / Keterangan Spesifik</label>
+                        <input type="text" id="pengajuan_kegiatan" required placeholder="Contoh: Pembelian buku di Toko A">
+                    </div>
+                    <div class="form-group">
+                        <label>Volume Pengajuan</label>
+                        <input type="number" id="pengajuan_volume" min="1" required oninput="calcPengajuanTotal()">
+                        <small id="max_volume_info" style="color:var(--danger);"></small>
+                    </div>
+                    <div class="form-group">
+                        <label>Estimasi Biaya Satuan (Rencana)</label>
+                        <input type="text" id="pengajuan_estimasi_rencana" readonly style="background: #eef2f6; color: var(--muted); font-weight: bold;">
+                        <small style="color:var(--muted); font-size:11px;">Acuan dari Rencana Anggaran disetujui</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Biaya Satuan Aktual (Rp)</label>
+                        <input type="text" id="pengajuan_estimasi" required oninput="formatRupiahInput(this); calcPengajuanTotal()">
+                        <small style="color:var(--danger); font-size:11px;">Tidak boleh lebih besar dari estimasi</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Total Pengajuan (Rp)</label>
+                        <input type="text" id="pengajuan_total" readonly style="background: #eef2f6; font-weight: bold; color: var(--primary2);">
+                    </div>
+                </div>
+                <div style="margin-top: 20px; text-align: right;">
+                    <button type="button" class="btn btn-light" onclick="closePengajuanModal()">Batal</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Ajukan ke Admin</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="db.js"></script>
+    <script>
+        // ================= INISIALISASI =================
+        let currentUser = null;
+        try { currentUser = JSON.parse(localStorage.getItem("currentUser")); } catch(e) {}
+        
+        if (!currentUser || currentUser.role.toLowerCase() !== "guru") {
+            window.location.href = "index.html";
+        }
+        
+        document.getElementById("userDisplayName").innerText = currentUser.nama;
+
+        if (!db["Status Anggaran Guru"]) db["Status Anggaran Guru"] = [];
+        if (!db["Rencana Anggaran"]) db["Rencana Anggaran"] = [];
+        if (!db["Pengajuan"]) db["Pengajuan"] = [];
+        
+        let tahunAktifData = (db["Tahun Anggaran"] || []).find(x => x.status === "Aktif");
+        let tahunAktif = tahunAktifData ? tahunAktifData.tahun : new Date().getFullYear().toString();
+
+        function getStatusObj() {
+            return db["Status Anggaran Guru"].find(x => x.guru === currentUser.nama && x.tahun === tahunAktif);
+        }
+
+        function getStatusAnggaran() {
+            let s = getStatusObj();
+            return s ? s.status : null;
+        }
+
+        function myRencana() {
+            return db["Rencana Anggaran"].filter(x => x.nama_guru === currentUser.nama && x.tahun === tahunAktif);
+        }
+
+                function getPlafonGuru() {
+            let entry = (db["Anggaran Kebutuhan Guru"] || []).find(x => 
+                x.guru === currentUser.nama && 
+                x.tahun === tahunAktif && 
+                x.status === "Aktif"
+            );
+            return entry ? Number(entry.plafon) || 0 : 0;
+        }
+
+        function getPlafonGuruObj() {
+            return (db["Anggaran Kebutuhan Guru"] || []).find(x => 
+                x.guru === currentUser.nama && 
+                x.tahun === tahunAktif
+            );
+        }
+
+        // Pastikan plafon_disetujui ter-set setelah RAB pertama kali disetujui
+        function ensurePlafon() {
+            let s = getStatusObj();
+            if (!s) return;
+            if (s.status === "Disetujui" && (s.plafon_disetujui === undefined || s.plafon_disetujui === null)) {
+                s.plafon_disetujui = total(myRencana(), "total");
+                saveDB();
+            }
+        }
+        ensurePlafon();
+
+        /* =====================================================
+           NAVIGASI
+        ===================================================== */
+        function setActiveMenu(activeId) {
+            document.querySelectorAll(".menu-item").forEach(el => el.classList.remove("active"));
+            document.getElementById("menu-" + activeId.split("_")[0])?.classList.add("active");
+            if (window.innerWidth <= 900) document.getElementById("sidebar")?.classList.remove("show");
+        }
+
+        function loadGuruPage(page) {
+            setActiveMenu(page);
+            if (page === "dashboard") renderDashboard();
+            else if (page === "rencana_anggaran") renderRencanaAnggaran();
+            else if (page === "pengajuan") renderPengajuan();
+        }
+
+        /* =====================================================
+           DASHBOARD
+        ===================================================== */
+                function renderDashboard() {
+            document.getElementById("topTitle").innerText = "Dashboard Guru";
+            let status = getStatusAnggaran();
+            let plafonGuru = getPlafonGuru();
+            let plafonObj = getPlafonGuruObj();
+            
+            let html = `<div class="page-header"><div><h1>Selamat Datang, ${currentUser.nama}</h1><p>Portal Pengelolaan Anggaran & Pengeluaran Tahun ${tahunAktif}</p></div></div>`;
+
+            // Belum ada plafon dari admin
+            if (!plafonObj || plafonObj.status !== "Aktif") {
+                html += `
+                <div class="info-callout warning">
+                    <strong><i class="fa-solid fa-lock"></i> Menunggu Penetapan Plafon Anggaran</strong><br>
+                    Admin belum menetapkan/mengaktifkan plafon anggaran untuk Anda pada tahun ${tahunAktif}. 
+                    Anda tidak dapat menyusun Rencana Anggaran sampai admin menetapkan plafonnya.
+                    <br><br>
+                    <small style="color:var(--muted);">Hubungi Administrator / Kepala Sekolah untuk info lebih lanjut.</small>
+                </div>
+                <div class="cards">
+                    <div class="card">
+                        <div class="card-icon blue"><i class="fa-solid fa-hourglass-half"></i></div>
+                        <div class="card-title">Status Plafon</div>
+                        <div class="card-value" style="font-size:16px; color: var(--warning);">Belum Ditetapkan</div>
+                    </div>
+                </div>`;
+                document.getElementById("app").innerHTML = html;
+                return;
+            }
+
+            // Sudah ada plafon, tapi tahun anggaran belum diaktifkan guru
+            if (!status) {
+                html += `
+                <div class="info-callout success">
+                    <strong><i class="fa-solid fa-check-circle"></i> Plafon Anggaran Anda Telah Ditetapkan</strong><br>
+                    Plafon: <b>${rupiah(plafonGuru)}</b> ${plafonObj.keterangan ? `• ${plafonObj.keterangan}` : ''}<br><br>
+                    Klik tombol di bawah untuk mulai menyusun Rencana Anggaran.
+                    <br><br>
+                    <button class="btn btn-primary" onclick="aktifkanTahunAnggaran()"><i class="fa-solid fa-play"></i> Mulai Susun Anggaran ${tahunAktif}</button>
+                </div>`;
+            } else {
+                let calloutClass = status === "Disetujui" ? "success" : (status === "Draft" ? "" : "warning");
+                let calloutIcon = status === "Disetujui" ? "fa-circle-check" : (status === "Draft" ? "fa-pen-to-square" : "fa-clock");
+                let desc = "";
+                if (status === "Draft") desc = "Silakan lengkapi rencana anggaran Anda di menu Rencana Anggaran, lalu ajukan ke Admin.";
+                else if (status === "Menunggu") desc = "Rencana Anggaran Anda sedang direview oleh Admin.";
+                else if (status === "Menunggu Perubahan") desc = "Permohonan perubahan anggaran Anda sedang direview Admin.";
+                else if (status === "Disetujui") desc = "Rencana Anggaran telah disetujui. Anda dapat mengajukan Pengeluaran.";
+
+                html += `
+                <div class="info-callout ${calloutClass}">
+                    <strong><i class="fa-solid ${calloutIcon}"></i> Status Rencana Anggaran Anda: ${status.toUpperCase()}</strong><br>
+                    ${desc}
+                </div>`;
+            }
+
+            let myR = myRencana();
+            let totalRencana = total(myR, "total");
+            let myPengajuan = db["Pengajuan"].filter(x => x.nama_guru === currentUser.nama && x.tahun === tahunAktif && x.approval_status === "Disetujui");
+            let totalTerserap = total(myPengajuan, "total");
+            let sisaPlafon = plafonGuru - totalRencana;
+
+            html += `
+                <div class="cards">
+                    <div class="card">
+                        <div class="card-icon orange"><i class="fa-solid fa-wallet"></i></div>
+                        <div class="card-title">Plafon Anggaran Anda</div>
+                        <div class="card-value" style="color: var(--warning);">${rupiah(plafonGuru)}</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon blue"><i class="fa-solid fa-list-check"></i></div>
+                        <div class="card-title">Item Rencana (${myR.length} item)</div>
+                        <div class="card-value">${rupiah(totalRencana)}</div>
+                        <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">Sisa: ${rupiah(sisaPlafon)}</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon green"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+                        <div class="card-title">Total Pengeluaran Disetujui</div>
+                        <div class="card-value" style="color:var(--success);">${rupiah(totalTerserap)}</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById("app").innerHTML = html;
+        }
+
+        function aktifkanTahunAnggaran() {
+            db["Status Anggaran Guru"].push({
+                id: Date.now(), guru: currentUser.nama, tahun: tahunAktif, status: "Draft"
+            });
+            saveDB();
+            toast(`Tahun Anggaran ${tahunAktif} diaktifkan!`);
+            renderDashboard();
+        }
+
+        /* =====================================================
+           RENCANA ANGGARAN (HALAMAN UTAMA)
+        ===================================================== */
+                function renderRencanaAnggaran() {
+            document.getElementById("topTitle").innerText = "Rencana Anggaran";
+            let status = getStatusAnggaran();
+            
+            if (!status) {
+                document.getElementById("app").innerHTML = `
+                <div class="page-header"><div><h1>Penyusunan Rencana Anggaran</h1></div></div>
+                <div class="info-callout warning">Silakan aktifkan Tahun Anggaran terlebih dahulu di halaman Dashboard sebelum menyusun rencana.</div>`;
+                return;
+            }
+
+            let items = myRencana();
+            let s = getStatusObj();
+            let sumberDanaMap = s?.sumber_dana_map || {};
+            
+            // Group by kategori_belanja
+            let groups = {};
+            items.forEach(it => {
+                let kat = it.kategori_belanja || "(Tanpa Kategori)";
+                if (!groups[kat]) groups[kat] = [];
+                groups[kat].push(it);
+            });
+            let kategoriKeys = Object.keys(groups).sort();
+
+            let btnAction = "";
+                        if (status === "Draft") {
+                btnAction = `
+                <button class="btn btn-success" onclick="ajukanRencanaAdmin()"><i class="fa-solid fa-paper-plane"></i> Ajukan Anggaran ke Admin</button>
+                <button class="btn btn-primary" onclick="openRencanaModal()"><i class="fa-solid fa-plus"></i> Tambah Item Kebutuhan</button>`;
+            } else if (status === "Disetujui") {
+                btnAction = `<button class="btn btn-warning" onclick="openPerubahanModal()"><i class="fa-solid fa-pen-to-square"></i> Ajukan Perubahan Anggaran</button>`;
+            } else if (status === "Menunggu" || status === "Menunggu Perubahan") {
+                btnAction = `<span class="badge badge-warning" style="padding: 10px; font-size:13px;"><i class="fa-solid fa-clock"></i> Rencana Terkunci (Sedang Direview)</span>`;
+            }
+
+            let infoBanner = "";
+            if (status === "Disetujui") {
+                let plafon = s?.plafon_disetujui || total(items, "total");
+                infoBanner = `
+                <div class="info-callout">
+                    <strong><i class="fa-solid fa-lock"></i> Rencana Anggaran Telah Disetujui</strong><br>
+                    Plafon anggaran Anda: <b>${rupiah(plafon)}</b>. Sumber dana setiap kategori ditetapkan oleh Admin saat approval.
+                    Untuk mengubah item, klik <b>Ajukan Perubahan Anggaran</b>.
+                </div>`;
+            } else if (status === "Menunggu Perubahan") {
+                infoBanner = `
+                <div class="info-callout warning">
+                    <strong><i class="fa-solid fa-clock"></i> Permohonan Perubahan Sedang Direview</strong><br>
+                    Admin sedang mereview permohonan perubahan anggaran Anda.
+                </div>`;
+            }
+
+            let groupsHtml = "";
+            if (kategoriKeys.length === 0) {
+                groupsHtml = `<div class="box"><p style="text-align:center; color:var(--muted); padding: 30px;">Belum ada item rencana anggaran.</p></div>`;
+            } else {
+                groupsHtml = kategoriKeys.map(kat => {
+                    let itemsKat = groups[kat];
+                    let totalKat = itemsKat.reduce((s, x) => s + (Number(x.total) || 0), 0);
+                    let sumber = sumberDanaMap[kat] || null;
+                    
+                    return `
+                    <div class="box" style="margin-bottom: 18px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 2px solid var(--primary2); margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                            <div>
+                                <h3 style="color: var(--primary); margin: 0; font-size: 16px;">
+                                    <i class="fa-solid fa-folder-open" style="margin-right: 8px; color: var(--primary2);"></i> ${kat}
+                                </h3>
+                                <small style="color: var(--muted); font-size: 12px;">${itemsKat.length} item • Total: <b style="color: var(--primary);">${rupiah(totalKat)}</b></small>
+                            </div>
+                            ${sumber ? `
+                            <span style="background: #dff5e8; color: #198754; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
+                                <i class="fa-solid fa-wallet"></i> Sumber: ${sumber}
+                            </span>` : `
+                            <span style="background: #fff0cf; color: #9a6500; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
+                                <i class="fa-solid fa-clock"></i> Menunggu penetapan sumber dana
+                            </span>`}
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px;">No</th>
+                                        <th>Uraian Kebutuhan</th>
+                                        <th style="text-align:center;">Volume</th>
+                                        <th style="text-align:right;">Estimasi Satuan</th>
+                                        <th style="text-align:right;">Total Biaya</th>
+                                        <th style="text-align:center; width: 100px;">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${itemsKat.map((x, i) => `
+                                        <tr>
+                                            <td>${i+1}</td>
+                                            <td><strong>${x.uraian}</strong></td>
+                                            <td style="text-align:center;">${x.volume}</td>
+                                            <td style="text-align:right;">${rupiah(x.nilai)}</td>
+                                            <td style="color:var(--primary); font-weight:bold; text-align:right;">${rupiah(x.total)}</td>
+                                            <td style="text-align:center;">
+                                                ${status === "Draft" ? `
+                                                    <button class="btn btn-light btn-sm" onclick="openRencanaModal(${x.id})"><i class="fa-solid fa-pen" style="color:var(--primary2);"></i></button>
+                                                    <button class="btn btn-light btn-sm" onclick="deleteRencana(${x.id})"><i class="fa-solid fa-trash" style="color:var(--danger);"></i></button>
+                                                ` : `<span class="badge-locked"><i class="fa-solid fa-lock"></i> Terkunci</span>`}
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>`;
+                }).join("");
+            }
+
+                        // Cek plafon
+            let plafonGuru = getPlafonGuru();
+            if (plafonGuru <= 0) {
+                document.getElementById("app").innerHTML = `
+                <div class="page-header"><div><h1>Rencana Anggaran</h1></div></div>
+                <div class="info-callout warning">
+                    <strong><i class="fa-solid fa-lock"></i> Plafon Belum Ditetapkan</strong><br>
+                    Admin belum menetapkan/mengaktifkan plafon anggaran untuk Anda. Silakan hubungi admin terlebih dahulu.
+                </div>`;
+                return;
+            }
+
+            document.getElementById("app").innerHTML = `
+                <div class="page-header">
+                    <div>
+                        <h1>Rencana Anggaran Tahunan</h1>
+                        <p>Daftar alokasi anggaran Anda untuk Tahun Pelajaran ${tahunAktif}, dikelompokkan per kategori belanja</p>
+                    </div>
+                    <div style="display:flex; gap:10px; flex-wrap: wrap;">${btnAction}</div>
+                </div>
+                ${infoBanner}
+                ${groupsHtml}
+            `;
+        }
+
+        /* =====================================================
+           MODAL RENCANA (MODE DRAFT)
+        ===================================================== */
+        function calcRencanaTotal() {
+            let vol = Number(document.getElementById("rencana_volume").value || 0);
+            let val = Number(document.getElementById("rencana_nilai").value.replace(/\./g, '') || 0);
+            document.getElementById("rencana_total").value = (vol * val) ? (vol * val).toLocaleString('id-ID') : "";
+        }
+
+                function openRencanaModal(id = null) {
+            document.getElementById("formRencana").reset();
+            document.getElementById("rencana_id").value = id || "";
+            document.getElementById("modalTitleRencana").innerText = id ? "Edit Item Anggaran" : "Tambah Item Anggaran";
+            
+            // Isi datalist kategori dari yang sudah ada
+            let kategoriExisting = [...new Set(myRencana().map(x => x.kategori_belanja).filter(Boolean))];
+            document.getElementById("daftarKategoriBelanja").innerHTML = kategoriExisting.map(k => `<option value="${k}">`).join("");
+            
+            if (id) {
+                let item = db["Rencana Anggaran"].find(x => x.id === id);
+                if (!item) return;
+                document.getElementById("rencana_kategori_belanja").value = item.kategori_belanja || "";
+                document.getElementById("rencana_uraian").value = item.uraian;
+                document.getElementById("rencana_volume").value = item.volume;
+                document.getElementById("rencana_nilai").value = Number(item.nilai).toLocaleString('id-ID');
+                document.getElementById("rencana_total").value = Number(item.total).toLocaleString('id-ID');
+            }
+            document.getElementById("modalRencana").classList.add("show");
+        }
+
+        function closeRencanaModal() { document.getElementById("modalRencana").classList.remove("show"); }
+
+        document.getElementById("formRencana").addEventListener("submit", function(e) {
+            e.preventDefault();
+            let id = document.getElementById("rencana_id").value;
+            let obj = {
+                nama_guru: currentUser.nama,
+                tahun: tahunAktif,
+                kategori_belanja: document.getElementById("rencana_kategori_belanja").value.trim(),
+                uraian: document.getElementById("rencana_uraian").value,
+                volume: Number(document.getElementById("rencana_volume").value),
+                nilai: Number(document.getElementById("rencana_nilai").value.replace(/\./g, '')),
+                total: Number(document.getElementById("rencana_total").value.replace(/\./g, ''))
+            };
+
+            if (id) {
+                let idx = db["Rencana Anggaran"].findIndex(x => x.id == id);
+                obj.id = Number(id);
+                obj.kode = db["Rencana Anggaran"][idx].kode;
+                db["Rencana Anggaran"][idx] = obj;
+                toast("Item berhasil diperbarui");
+            } else {
+                obj.id = Date.now();
+                obj.kode = "R-" + Date.now().toString().slice(-4);
+                db["Rencana Anggaran"].push(obj);
+                toast("Item berhasil ditambahkan");
+            }
+            saveDB(); closeRencanaModal(); renderRencanaAnggaran();
+        });
+
+        function deleteRencana(id) {
+            Swal.fire({
+                title: 'Hapus Item?', text: 'Item rencana ini akan dihapus.', icon: 'warning',
+                showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Ya, Hapus'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    db["Rencana Anggaran"] = db["Rencana Anggaran"].filter(x => x.id !== id);
+                    saveDB(); renderRencanaAnggaran(); toast("Item dihapus");
+                }
+            });
+        }
+
+                function ajukanRencanaAdmin() {
+            let myR = myRencana();
+            if(myR.length === 0) return toast("Rencana anggaran masih kosong!");
+            
+            let totalRAB = myR.reduce((s, x) => s + (Number(x.total) || 0), 0);
+            let plafon = getPlafonGuru();
+            
+            if (totalRAB > plafon) {
+                Swal.fire('Melebihi Plafon!', `Total RAB Anda (${rupiah(totalRAB)}) melebihi plafon yang ditetapkan admin (${rupiah(plafon)}).<br><br>Kurangi beberapa item terlebih dahulu.`, 'error');
+                return;
+            }
+            
+            Swal.fire({
+                title: 'Ajukan ke Admin?',
+                text: "Setelah diajukan, rencana anggaran akan TERKUNCI. Anda tidak dapat mengubahnya hingga direview admin.",
+                icon: 'question', showCancelButton: true, confirmButtonText: 'Ya, Ajukan'
+            }).then((res) => {
+                if(res.isConfirmed) {
+                    let idx = db["Status Anggaran Guru"].findIndex(x => x.guru === currentUser.nama && x.tahun === tahunAktif);
+                    db["Status Anggaran Guru"][idx].status = "Menunggu";
+                    saveDB(); renderRencanaAnggaran();
+                    Swal.fire('Terkirim!', 'Rencana anggaran telah diajukan.', 'success');
+                }
+            });
+        }
+
+        /* =====================================================
+           MODAL PERUBAHAN ANGGARAN (MODE DISETUJUI)
+        ===================================================== */
+        let perubahanDraft = { items: [], plafon: 0, editingId: null, originalTotal: 0 };
+
+        function openPerubahanModal() {
+            let plafon = getPlafonGuru();
+            if (plafon <= 0) {
+                toast("Plafon anggaran Anda belum ditetapkan admin!");
+                return;
+            }
+            
+            // Snapshot draft dari RAB yang ada
+            perubahanDraft.items = JSON.parse(JSON.stringify(myRencana()));
+            perubahanDraft.plafon = plafon;
+            perubahanDraft.editingId = null;
+            perubahanDraft.originalTotal = total(perubahanDraft.items, "total");
+
+            // Daftar ID item yang diizinkan admin untuk diubah (kalau ada)
+            let statusObj = getStatusObj();
+            let unlockedIds = (statusObj && statusObj.unlocked_item_ids) ? statusObj.unlocked_item_ids : [];
+            
+            // Tandai setiap item:
+            // - _original = true  → item lama dari RAB yang sudah disetujui
+            // - _locked = true    → item lama TIDAK BOLEH diubah (kecuali ada di unlockedIds)
+            perubahanDraft.items.forEach(it => {
+                it._original = true;
+                if (unlockedIds.includes(it.id)) {
+                    it._locked = false;   // Admin izinkan edit
+                } else {
+                    it._locked = true;    // Terkunci permanen
+                }
+            });
+            
+            renderPerubahanList();
+            document.getElementById("modalPerubahan").classList.add("show");
+        }
+
+        function closePerubahanModal() {
+            document.getElementById("modalPerubahan").classList.remove("show");
+            perubahanDraft.editingId = null;
+        }
+
+        function renderPerubahanList() {
+            let d = perubahanDraft;
+            let totalDraft = d.items.reduce((sum, x) => sum + (Number(x.total) || 0), 0);
+            let sisa = d.plafon - totalDraft;
+            let persen = d.plafon ? Math.min(100, Math.round((totalDraft / d.plafon) * 100)) : 0;
+            let isOver = totalDraft > d.plafon;
+            let barColor = isOver ? '#dc3545' : (persen >= 90 ? '#f59e0b' : '#22c55e');
+            
+            // Group by kategori
+            let groups = {};
+            d.items.forEach(it => {
+                let kat = it.kategori_belanja || "(Tanpa Kategori)";
+                if (!groups[kat]) groups[kat] = [];
+                groups[kat].push(it);
+            });
+            let kategoriKeys = Object.keys(groups).sort();
+
+            document.getElementById("perubahanTitle").innerText = "Ajukan Perubahan Anggaran";
+            document.getElementById("perubahanSubtitle").innerText = `Tahun ${tahunAktif} — Anda dapat menambah, mengubah, atau menghapus item selama total tidak melebihi plafon`;
+
+            let groupsHtml = "";
+            if (kategoriKeys.length === 0) {
+                groupsHtml = `<div style="text-align:center; padding: 40px; color: var(--muted);">Belum ada item anggaran. Klik Tambah Barang Baru untuk memulai.</div>`;
+            } else {
+                groupsHtml = kategoriKeys.map(kat => {
+                    let itemsKat = groups[kat];
+                    let totalKat = itemsKat.reduce((s, x) => s + (Number(x.total) || 0), 0);
+                    return `
+                    <div style="margin-bottom: 16px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden;">
+                        <div style="background: #f1f5f9; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border);">
+                            <div style="font-weight: bold; color: var(--primary); font-size: 13px;">
+                                <i class="fa-solid fa-folder-open" style="margin-right: 6px;"></i> ${kat}
+                            </div>
+                            <div style="font-size: 12px; color: var(--muted);">
+                                ${itemsKat.length} item • <b style="color: var(--primary);">${rupiah(totalKat)}</b>
+                            </div>
+                        </div>
+                        <table style="margin: 0;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">No</th>
+                                    <th>Uraian</th>
+                                    <th style="text-align:center;">Vol</th>
+                                    <th style="text-align:right;">Harga Satuan</th>
+                                    <th style="text-align:right;">Total</th>
+                                    <th style="text-align:center; width: 100px;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itemsKat.map((x, i) => `
+                                    <tr>
+                                        <td>${i+1}</td>
+                                        <td>
+                                            <strong>${x.uraian}</strong>
+                                            ${x._isNew ? '<span class="item-tag-new">BARU</span>' : ''}
+                                            ${x._isModified ? '<span class="item-tag-edit">DIUBAH</span>' : ''}
+                                        </td>
+                                        <td style="text-align:center;">${x.volume}</td>
+                                        <td style="text-align:right;">${rupiah(x.nilai)}</td>
+                                        <td style="text-align:right; font-weight:bold; color: var(--primary);">${rupiah(x.total)}</td>
+                                                                                <td style="text-align:center;">
+                                            ${x._locked ? `
+                                                <span style="display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:bold; padding:4px 8px; border-radius:6px; background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0;" title="Barang ini sudah disetujui admin dan tidak dapat diubah">
+                                                    <i class="fa-solid fa-lock"></i> Terkunci
+                                                </span>
+                                            ` : `
+                                                <button class="btn btn-light btn-sm" onclick="openItemPerubahanForm(${x.id})" title="Edit">
+                                                    <i class="fa-solid fa-pen" style="color:var(--primary2);"></i>
+                                                </button>
+                                                <button class="btn btn-light btn-sm" onclick="hapusItemDraft(${x.id})" style="background:#fff5f5; border:1px solid #ffcccc;" title="Hapus">
+                                                    <i class="fa-solid fa-trash" style="color:var(--danger);"></i>
+                                                </button>
+                                            `}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>`;
+                }).join("");
+            }
+
+            document.getElementById("perubahanContent").innerHTML = `
+                <div class="plafon-summary ${isOver ? 'plafon-over' : ''}">
+                    <div class="ps-item">
+                        <div class="ps-label">Plafon Anggaran</div>
+                        <div class="ps-value" style="color: var(--primary);">${rupiah(d.plafon)}</div>
+                    </div>
+                    <div class="ps-item">
+                        <div class="ps-label">Total Setelah Perubahan</div>
+                        <div class="ps-value" style="color: ${isOver ? 'var(--danger)' : 'var(--text)'};">${rupiah(totalDraft)}</div>
+                    </div>
+                    <div class="ps-item">
+                        <div class="ps-label">Sisa Saldo</div>
+                        <div class="ps-value" style="color: ${isOver ? 'var(--danger)' : 'var(--success)'};">${rupiah(sisa)}</div>
+                    </div>
+                    <div style="grid-column: 1 / -1;">
+                        <div class="progress-bar-outer">
+                            <div class="progress-bar-inner" style="width: ${persen}%; background: ${barColor};"></div>
+                        </div>
+                        <div style="font-size: 11px; color: var(--muted); margin-top: 6px; text-align: center;">
+                            Serapan: <strong style="color: ${barColor};">${persen}%</strong> dari plafon
+                        </div>
+                    </div>
+                </div>
+
+                ${isOver ? `
+                <div class="info-callout danger" style="margin-bottom: 15px;">
+                    <strong><i class="fa-solid fa-triangle-exclamation"></i> Total anggaran melebihi plafon!</strong><br>
+                    Kurangi volume atau harga item, atau hapus beberapa item sebelum mengajukan.
+                </div>` : ''}
+                
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                    <p style="font-size: 13px; color: var(--muted); margin: 0;">
+                        <i class="fa-solid fa-info-circle"></i> Item dikelompokkan per kategori belanja.
+                    </p>
+                    <button class="btn btn-primary btn-sm" onclick="openItemPerubahanForm(null)">
+                        <i class="fa-solid fa-plus"></i> Tambah Barang Baru
+                    </button>
+                </div>
+                
+                <div style="max-height: 400px; overflow-y: auto; padding-right: 4px;">
+                    ${groupsHtml}
+                </div>
+                
+                <div style="margin-top:20px; text-align:right; display:flex; justify-content: flex-end; gap: 10px;">
+                    <button class="btn btn-light" onclick="closePerubahanModal()">Batal</button>
+                    <button class="btn btn-success" onclick="submitPerubahan()" ${isOver || d.items.length === 0 ? 'disabled' : ''}>
+                        <i class="fa-solid fa-paper-plane"></i> Kirim Perubahan ke Admin
+                    </button>
+                </div>
+            `;
+        }
+
+        /* ---------- Form Item (dalam modal perubahan) ---------- */
+        function openItemPerubahanForm(id = null) {
+
+            if (id) {
+                let itemCek = perubahanDraft.items.find(x => x.id === id);
+                if (itemCek && itemCek._locked) {
+                    Swal.fire('Item Terkunci', 'Barang ini sudah disetujui admin dan tidak dapat diubah.<br><br>Jika ingin mengubahnya, hubungi admin untuk membuka akses.', 'warning');
+                    return;
+                }
+            }
+
+
+            perubahanDraft.editingId = id;
+            let item = id ? perubahanDraft.items.find(x => x.id === id) : null;
+            
+            let otherTotal = perubahanDraft.items
+                .filter(x => x.id !== id)
+                .reduce((s, x) => s + (Number(x.total) || 0), 0);
+            let maxForItem = perubahanDraft.plafon - otherTotal;
+            let isEdit = id !== null;
+            let kategoriExisting = [...new Set(perubahanDraft.items.map(x => x.kategori_belanja).filter(Boolean))];
+
+            document.getElementById("perubahanTitle").innerText = isEdit ? "Edit Item Anggaran" : "Tambah Item Anggaran Baru";
+            document.getElementById("perubahanSubtitle").innerText = "Maksimal nilai yang dapat dimasukkan tidak boleh melebihi sisa anggaran";
+
+            document.getElementById("perubahanContent").innerHTML = `
+                <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; color: #1e40af;">
+                    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                        <div><strong>Plafon:</strong> ${rupiah(perubahanDraft.plafon)}</div>
+                        <div><strong>Terpakai Item Lain:</strong> ${rupiah(otherTotal)}</div>
+                        <div><strong>Maksimal Item Ini:</strong> <span style="color: #dc3545; font-size: 14px;">${rupiah(maxForItem)}</span></div>
+                    </div>
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-group full">
+                        <label>Kategori Belanja</label>
+                        <input type="text" id="pr_kategori_belanja" value="${item?.kategori_belanja || ''}" required list="daftarKategoriPerubahan" placeholder="Contoh: ATK, Kegiatan Pembelajaran">
+                        <datalist id="daftarKategoriPerubahan">${kategoriExisting.map(k => `<option value="${k}">`).join("")}</datalist>
+                        <small style="color:var(--muted); font-size:11px;">Ketik kategori existing atau buat kategori baru</small>
+                    </div>
+                    <div class="form-group full">
+                        <label>Uraian Kebutuhan / Barang</label>
+                        <input type="text" id="pr_uraian" value="${item?.uraian || ''}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Volume (Jumlah)</label>
+                        <input type="number" id="pr_volume" min="1" value="${item?.volume || 1}" required oninput="calcItemPerubahan()">
+                    </div>
+                    <div class="form-group">
+                        <label>Harga Satuan (Rp)</label>
+                        <input type="text" id="pr_nilai" value="${item ? Number(item.nilai).toLocaleString('id-ID') : ''}" required oninput="formatRupiahInput(this); calcItemPerubahan()">
+                    </div>
+                    <div class="form-group full">
+                        <label>Total (Rp)</label>
+                        <input type="text" id="pr_total" readonly style="background:#eef2f6; font-weight:bold; color: var(--primary);" value="${item ? Number(item.total).toLocaleString('id-ID') : ''}">
+                    </div>
+                </div>
+                
+                <div id="pr_warning" style="display: none; margin-top: 12px; background: #fef2f2; border-left: 4px solid #ef4444; padding: 10px 14px; border-radius: 6px; font-size: 12px; color: #991b1b;">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Total item melebihi sisa anggaran yang tersedia!
+                </div>
+                
+                <div style="margin-top:20px; text-align:right; display:flex; gap:10px; justify-content:flex-end;">
+                    <button class="btn btn-light" onclick="renderPerubahanList()"><i class="fa-solid fa-arrow-left"></i> Kembali</button>
+                    <button class="btn btn-primary" onclick="simpanItemPerubahan(${maxForItem})"><i class="fa-solid fa-save"></i> Simpan Item</button>
+                </div>
+            `;
+        }
+
+        function calcItemPerubahan() {
+            let vol = Number(document.getElementById("pr_volume").value || 0);
+            let val = Number(document.getElementById("pr_nilai").value.replace(/\./g, '') || 0);
+            let total = vol * val;
+            document.getElementById("pr_total").value = total ? total.toLocaleString('id-ID') : "";
+
+            // Live warning
+            let otherTotal = perubahanDraft.items
+                .filter(x => x.id !== perubahanDraft.editingId)
+                .reduce((s, x) => s + (Number(x.total) || 0), 0);
+            let maxForItem = perubahanDraft.plafon - otherTotal;
+            let warn = document.getElementById("pr_warning");
+            if (warn) warn.style.display = (total > maxForItem) ? "block" : "none";
+        }
+
+        function simpanItemPerubahan(maxForItem) {
+            let kategori_belanja = document.getElementById("pr_kategori_belanja").value.trim();
+            let uraian = document.getElementById("pr_uraian").value.trim();
+            let volume = Number(document.getElementById("pr_volume").value);
+            let nilai = Number(document.getElementById("pr_nilai").value.replace(/\./g, '') || 0);
+            let total = volume * nilai;
+
+            if (!kategori_belanja || !uraian || !volume || !nilai) {
+                toast("Mohon lengkapi semua kolom!");
+                return;
+            }
+
+            if (total > maxForItem) {
+                Swal.fire({
+                    title: 'Melebihi Plafon!',
+                    html: `Total item (<b>${rupiah(total)}</b>) melebihi sisa anggaran yang tersedia (<b>${rupiah(maxForItem)}</b>).`,
+                    icon: 'error'
+                });
+                return;
+            }
+
+            let editingId = perubahanDraft.editingId;
+            if (editingId) {
+                let idx = perubahanDraft.items.findIndex(x => x.id === editingId);
+                if (idx !== -1) {
+                    let oldItem = perubahanDraft.items[idx];
+                    perubahanDraft.items[idx] = {
+                        ...oldItem, kategori_belanja, uraian, volume, nilai, total,
+                        _isModified: true
+                    };
+                }
+            } 
+            else {
+                perubahanDraft.items.push({
+                    id: Date.now(), kode: "R-" + Date.now().toString().slice(-4),
+                    nama_guru: currentUser.nama, tahun: tahunAktif,
+                    kategori_belanja, uraian, volume, nilai, total,
+                    _isNew: true,
+                    _locked: false       // Item baru = bisa di-edit/hapus
+                });
+            }
+
+            perubahanDraft.editingId = null;
+            renderPerubahanList();
+            toast("Item tersimpan ke draft perubahan");
+        }
+
+        function hapusItemDraft(id) {
+
+            let itemCek = perubahanDraft.items.find(x => x.id === id);
+            if (itemCek && itemCek._locked) {
+                toast("Barang ini terkunci dan tidak dapat dihapus");
+                return;
+            }
+
+            Swal.fire({
+                title: 'Hapus Item?', 
+                text: 'Item akan dihapus dari daftar perubahan.', 
+                icon: 'warning',
+                showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Ya, Hapus', cancelButtonText: 'Batal'
+            }).then((r) => {
+                if (r.isConfirmed) {
+                    perubahanDraft.items = perubahanDraft.items.filter(x => x.id !== id);
+                    renderPerubahanList();
+                }
+            });
+        }
+
+                function submitPerubahan() {
+            let d = perubahanDraft;
+            let totalDraft = d.items.reduce((s, x) => s + (Number(x.total) || 0), 0);
+
+            if (totalDraft > d.plafon) {
+                toast("Total melebihi plafon anggaran! Periksa kembali.");
+                return;
+            }
+
+            if (d.items.length === 0) {
+                toast("Minimal harus ada 1 item anggaran!");
+                return;
+            }
+
+            Swal.fire({
+                title: 'Kirim Perubahan ke Admin?',
+                html: `Perubahan akan dikirim ke Admin untuk direview.<br><br>
+                       Total baru: <b style="color:var(--primary);">${rupiah(totalDraft)}</b><br>
+                       Plafon: <b>${rupiah(d.plafon)}</b>`,
+                icon: 'question', showCancelButton: true, confirmButtonText: 'Ya, Kirim', cancelButtonText: 'Batal'
+            }).then((r) => {
+                if (r.isConfirmed) {
+                                       // ============ BUILD CHANGES LOG ============
+                    let oldItems = myRencana();
+                    let oldMap = {};
+                    oldItems.forEach(it => { oldMap[it.id] = it; });
+
+                    let newMap = {};
+                    d.items.forEach(it => { newMap[it.id] = it; });
+
+                    let changesLog = [];
+
+                    d.items.forEach(newItem => {
+                        if (newItem._isNew) {
+                            changesLog.push({
+                                type: 'added',
+                                item_id: newItem.id,
+                                uraian: newItem.uraian,
+                                kategori_belanja: newItem.kategori_belanja,
+                                after: {
+                                    volume: newItem.volume,
+                                    nilai: newItem.nilai,
+                                    total: newItem.total
+                                }
+                            });
+                        } else if (oldMap[newItem.id]) {
+                            let old = oldMap[newItem.id];
+                            let fields = {};
+                            ['kategori_belanja', 'uraian', 'volume', 'nilai', 'total'].forEach(f => {
+                                let oldVal = old[f] ?? '';
+                                let newVal = newItem[f] ?? '';
+                                if (['volume', 'nilai', 'total'].includes(f)) {
+                                    if (Number(oldVal) !== Number(newVal)) {
+                                        fields[f] = { before: Number(oldVal), after: Number(newVal) };
+                                    }
+                                } else {
+                                    if (String(oldVal) !== String(newVal)) {
+                                        fields[f] = { before: oldVal, after: newVal };
+                                    }
+                                }
+                            });
+                            if (Object.keys(fields).length > 0) {
+                                changesLog.push({
+                                    type: 'modified',
+                                    item_id: newItem.id,
+                                    uraian: newItem.uraian,
+                                    kategori_belanja: newItem.kategori_belanja,
+                                    before_uraian: old.uraian,
+                                    fields: fields
+                                });
+                            }
+                        }
+                    });
+
+                    oldItems.forEach(oldItem => {
+                        if (!newMap[oldItem.id]) {
+                            changesLog.push({
+                                type: 'deleted',
+                                item_id: oldItem.id,
+                                uraian: oldItem.uraian,
+                                kategori_belanja: oldItem.kategori_belanja,
+                                before: {
+                                    volume: oldItem.volume,
+                                    nilai: oldItem.nilai,
+                                    total: oldItem.total
+                                }
+                            });
+                        }
+                    });
+                    // ============ END CHANGES LOG ============
+                    // ============ END CHANGES LOG ============
+
+                    // Hapus semua item lama guru ini & ganti dengan draft
+                    db["Rencana Anggaran"] = db["Rencana Anggaran"].filter(x => !(x.nama_guru === currentUser.nama && x.tahun === tahunAktif));
+                    
+                    d.items.forEach(item => {
+                        let clean = { ...item };
+                        delete clean._isNew;
+                        delete clean._isModified;
+                        delete clean._original;
+                        db["Rencana Anggaran"].push(clean);
+                    });
+
+                    // Update status + simpan changes_log
+                    let idx = db["Status Anggaran Guru"].findIndex(x => x.guru === currentUser.nama && x.tahun === tahunAktif);
+                    db["Status Anggaran Guru"][idx].status = "Menunggu Perubahan";
+                    db["Status Anggaran Guru"][idx].changes_log = changesLog;
+
+                    saveDB();
+                    closePerubahanModal();
+                    renderRencanaAnggaran();
+                    Swal.fire('Terkirim!', 'Perubahan anggaran telah diajukan ke Admin untuk direview.', 'success');
+                }
+            });
+        }
+
+        /* =====================================================
+           PENGAJUAN PENGELUARAN
+        ===================================================== */
+        function renderPengajuan() {
+            document.getElementById("topTitle").innerText = "Pengajuan Pengeluaran";
+            let status = getStatusAnggaran();
+
+            if (status !== "Disetujui") {
+                document.getElementById("app").innerHTML = `
+                <div class="page-header"><div><h1>Pengajuan Pengeluaran</h1></div></div>
+                <div class="info-callout warning">
+                    <strong>Akses Terkunci</strong><br>
+                    Anda hanya dapat membuat pengajuan pengeluaran jika Rencana Anggaran Anda telah berstatus <b>Disetujui</b> oleh Admin.
+                </div>`;
+                return;
+            }
+
+            let list = db["Pengajuan"].filter(x => x.nama_guru === currentUser.nama && x.tahun === tahunAktif);
+            list.sort((a,b) => b.id - a.id);
+
+            document.getElementById("app").innerHTML = `
+                <div class="page-header">
+                    <div>
+                        <h1>Riwayat Pengajuan Pengeluaran</h1>
+                        <p>Pengajuan kebutuhan harus sesuai dengan kuota di Rencana Anggaran Anda</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openPengajuanModal()"><i class="fa-solid fa-plus"></i> Buat Pengajuan Baru</button>
+                </div>
+
+                <div class="box">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nomor</th>
+                                    <th>Tanggal</th>
+                                    <th>Nama Kegiatan / Kebutuhan</th>
+                                    <th>Pos Rencana Terkait</th>
+                                    <th style="text-align:right;">Total Diajukan</th>
+                                    <th style="text-align:center;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${list.length === 0 ? `<tr><td colspan="6" style="text-align:center; color:var(--muted); padding: 20px;">Belum ada pengajuan pengeluaran yang dibuat.</td></tr>` : 
+                                list.map(x => `
+                                    <tr>
+                                        <td><strong>${x.nomor}</strong></td>
+                                        <td>${formatDate(x.tanggal)}</td>
+                                        <td>${x.kegiatan}</td>
+                                        <td><span class="badge badge-info">${x.uraian_anggaran}</span></td>
+                                        <td style="font-weight:bold; color:var(--primary); text-align:right;">${rupiah(x.total)}</td>
+                                        <td style="text-align:center;">${renderStatusBadge(x.approval_status || x.status)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStatusBadge(status) {
+            let s = (status || "").toLowerCase();
+            if (s === "disetujui") return `<span class="badge-status disetujui"><i class="fa-solid fa-circle-check"></i> Disetujui</span>`;
+            if (s === "ditolak") return `<span class="badge-status ditolak"><i class="fa-solid fa-circle-xmark"></i> Ditolak</span>`;
+            return `<span class="badge-status menunggu"><i class="fa-solid fa-clock"></i> Menunggu</span>`;
+        }
+
+        function openPengajuanModal() {
+            document.getElementById("formPengajuan").reset();
+            document.getElementById("pengajuan_nomor").value = "AJU-" + Date.now().toString().slice(-5);
+            document.getElementById("pengajuan_tanggal").value = new Date().toISOString().split('T')[0];
+            document.getElementById("pengajuan_estimasi_rencana").value = "";
+            document.getElementById("pengajuan_estimasi").value = "";
+            document.getElementById("pengajuan_total").value = "";
+            
+            let listRencana = myRencana();
+            let listPengajuan = db["Pengajuan"].filter(x => x.nama_guru === currentUser.nama && x.tahun === tahunAktif && x.approval_status !== "Ditolak");
+
+            let select = document.getElementById("pengajuan_uraian_anggaran");
+            let opts = `<option value="" data-sisa="0" data-kategori="" data-estimasi="0">-- Pilih Pos Rencana Anggaran --</option>`;
+            
+                        let s = getStatusObj();
+            let sumberDanaMap = s?.sumber_dana_map || {};
+            
+            listRencana.forEach(r => {
+                let terpakai = total(listPengajuan.filter(p => p.uraian_anggaran === r.uraian), "volume");
+                let sisaVol = r.volume - terpakai;
+                let sumber = sumberDanaMap[r.kategori_belanja] || "-";
+                
+                if (sisaVol > 0) {
+                    opts += `<option value="${r.uraian}" data-sisa="${sisaVol}" data-kategori="${r.kategori_belanja}" data-estimasi="${r.nilai || 0}" data-sumber="${sumber}">${r.uraian} (Sisa: ${sisaVol}) — ${sumber}</option>`;
+                }
+            });
+            select.innerHTML = opts;
+            document.getElementById("max_volume_info").innerText = "";
+            document.getElementById("modalPengajuan").classList.add("show");
+        }
+
+        function autoFillPengajuan() {
+            let select = document.getElementById("pengajuan_uraian_anggaran");
+            let estimateField = document.getElementById("pengajuan_estimasi_rencana");
+            let actualField = document.getElementById("pengajuan_estimasi");
+            let totalField = document.getElementById("pengajuan_total");
+            let volInput = document.getElementById("pengajuan_volume");
+            let maxVolInfo = document.getElementById("max_volume_info");
+
+            if (select.selectedIndex <= 0 || !select.value) {
+                volInput.removeAttribute("max");
+                volInput.value = "";
+                maxVolInfo.innerText = "";
+                estimateField.value = "";
+                actualField.value = "";
+                totalField.value = "";
+                return;
+            }
+
+            let selected = select.options[select.selectedIndex];
+            let maxVol = Number(selected.getAttribute("data-sisa") || 0);
+            let estimasi = Number(selected.getAttribute("data-estimasi") || 0);
+
+            if (maxVol > 0) {
+                volInput.setAttribute("max", maxVol);
+                maxVolInfo.innerText = `Maksimal kuota volume tersedia: ${maxVol}`;
+            }
+
+            estimateField.value = estimasi ? estimasi.toLocaleString('id-ID') : "0";
+            actualField.value = "";
+            totalField.value = "";
+            actualField.setAttribute("data-max-estimasi", estimasi);
+        }
+
+        function calcPengajuanTotal() {
+            let volInput = document.getElementById("pengajuan_volume");
+            let maxVol = Number(volInput.getAttribute("max") || 0);
+            let vol = Number(volInput.value || 0);
+
+            if (maxVol > 0 && vol > maxVol) {
+                toast(`Volume melebihi sisa kuota rencana (${maxVol})!`);
+                volInput.value = maxVol;
+                vol = maxVol;
+            }
+
+            let actualField = document.getElementById("pengajuan_estimasi");
+            let estimasi = Number(actualField.getAttribute("data-max-estimasi") || 0);
+            let val = Number(actualField.value.replace(/\./g, '') || 0);
+
+            if (estimasi > 0 && val > estimasi) {
+                toast(`Biaya aktual tidak boleh melebihi estimasi (${rupiah(estimasi)})!`);
+                actualField.value = estimasi.toLocaleString('id-ID');
+                val = estimasi;
+            }
+
+            document.getElementById("pengajuan_total").value = (vol * val) ? (vol * val).toLocaleString('id-ID') : "";
+        }
+
+        function formatRupiahInput(elem) {
+            let val = elem.value.replace(/[^,\d]/g, '');
+            let sisa = val.length % 3;
+            let rupiah = val.substr(0, sisa);
+            let ribuan = val.substr(sisa).match(/\d{3}/gi);
+            if (ribuan) rupiah += (sisa ? '.' : '') + ribuan.join('.');
+            elem.value = rupiah;
+        }
+
+        function closePengajuanModal() { document.getElementById("modalPengajuan").classList.remove("show"); }
+
+        document.getElementById("formPengajuan").addEventListener("submit", function(e) {
+            e.preventDefault();
+            let select = document.getElementById("pengajuan_uraian_anggaran");
+            let kategori = select.options[select.selectedIndex].getAttribute("data-kategori") || "-";
+            let estimasiRencana = Number(select.options[select.selectedIndex].getAttribute("data-estimasi") || 0);
+            let biayaAktual = Number(document.getElementById("pengajuan_estimasi").value.replace(/\./g, '') || 0);
+
+            if (estimasiRencana > 0 && biayaAktual > estimasiRencana) {
+                toast("Biaya aktual tidak boleh melebihi estimasi rencana!");
+                return;
+            }
+
+            let obj = {
+                id: Date.now(),
+                nomor: document.getElementById("pengajuan_nomor").value,
+                tanggal: document.getElementById("pengajuan_tanggal").value,
+                nama_guru: currentUser.nama,
+                tahun: tahunAktif,
+                uraian_anggaran: select.value,
+                kegiatan: document.getElementById("pengajuan_kegiatan").value,
+                kategori: kategori,
+                volume: Number(document.getElementById("pengajuan_volume").value),
+                estimasi_rencana: estimasiRencana,
+                estimasi_biaya: biayaAktual,
+                total: Number(document.getElementById("pengajuan_total").value.replace(/\./g, '')),
+                status: "Menunggu",
+                approval_status: "Menunggu",
+                catatan_admin: ""
+            };
+
+            db["Pengajuan"].push(obj);
+            saveDB();
+            closePengajuanModal();
+            renderPengajuan();
+            
+            Swal.fire('Terkirim!', 'Pengajuan berhasil dikirim dan menunggu persetujuan Admin.', 'success');
+        });
+
+        /* =====================================================
+           LOGOUT
+        ===================================================== */
+        function confirmLogout() {
+            Swal.fire({
+                title: 'Konfirmasi Keluar', text: 'Apakah Anda yakin ingin keluar dari akun Guru?', icon: 'question',
+                showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Ya, Logout', cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    localStorage.removeItem("currentUser");
+                    window.location.href = "index.html";
+                }
+            });
+        }
+
+        loadGuruPage("dashboard");
+    </script>
+</body>
+</html>
